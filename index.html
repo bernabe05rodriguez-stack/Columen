@@ -11,9 +11,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..700,0..100;1,9..144,300..700,0..100&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --cream:#f7f4ed;
-    --cream-2:#f2ede2;
-    --cream-border:#eceae4;
+    --cream:#f4f1e9;
+    --cream-2:#ede8dc;
+    --cream-border:#e4dfd2;
     --ink:#1c1c1c;
     --ink-82:rgba(28,28,28,.82);
     --ink-40:rgba(28,28,28,.4);
@@ -28,7 +28,15 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
-  body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;background:var(--cream);color:var(--ink);line-height:1.5;font-weight:400}
+  body{
+    font-family:'Inter',ui-sans-serif,system-ui,sans-serif;color:var(--ink);line-height:1.5;font-weight:400;
+    background:
+      radial-gradient(ellipse 900px 600px at 15% 10%, rgba(184,151,74,.06), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 85% 80%, rgba(70,90,120,.05), transparent 60%),
+      radial-gradient(ellipse 800px 600px at 50% 50%, rgba(190,170,140,.04), transparent 70%),
+      #f4f1e9;
+    background-attachment:fixed;
+  }
   ::selection{background:var(--gold);color:var(--cream)}
   a{color:inherit;text-decoration:none}
   .container{max-width:1100px;margin:0 auto;padding:0 28px}
@@ -64,7 +72,7 @@
   .brand-text .name{font-family:'Fraunces',serif;font-size:22px;font-weight:500;letter-spacing:.14em}
   .brand-text .sub{font-size:10px;letter-spacing:.26em;color:var(--gold);text-transform:uppercase;margin-top:5px;font-weight:500}
 
-  header{position:sticky;top:0;z-index:50;background:rgba(247,244,237,.85);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--cream-border)}
+  header{position:sticky;top:0;z-index:50;background:rgba(244,241,233,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--cream-border)}
   .nav{display:flex;align-items:center;justify-content:space-between;height:72px}
   nav ul{display:flex;gap:32px;list-style:none}
   nav a{font-size:14px;position:relative;transition:color .2s}
