@@ -276,6 +276,11 @@ app.post('/consulta', (req, res) => {
 
 // --- WhatsApp bot (Cloud API directo, sin Kapso) ---
 const processedMessages = new Set();
+const debugLog = [];
+function logDebug(event) {
+  debugLog.push({ ts: new Date().toISOString(), ...event });
+  if (debugLog.length > 100) debugLog.shift();
+}
 
 async function waSend(payload) {
   if (!WA_TOKEN || !WA_PHONE_ID) {
@@ -289,10 +294,16 @@ async function waSend(payload) {
       body: JSON.stringify(payload),
     });
     const data = await res.json();
-    if (!res.ok) console.error('[WA] send error', JSON.stringify(data));
+    if (!res.ok) {
+      console.error('[WA] send error', JSON.stringify(data));
+      logDebug({ kind: 'send_error', status: res.status, data });
+    } else {
+      logDebug({ kind: 'send_ok', to: payload.to, type: payload.type });
+    }
     return data;
   } catch (err) {
     console.error('[WA] fetch failed', err.message);
+    logDebug({ kind: 'send_fetch_failed', error: err.message });
   }
 }
 
@@ -393,6 +404,13 @@ async function handleTextInFlow(from, text) {
   }
 }
 
+// Debug endpoint - muestra ultimos eventos del bot
+app.get('/bot-debug', (req, res) => {
+  if (req.query.key !== 'columen-debug-2026') return res.status(403).json({ error: 'forbidden' });
+  const states = db.prepare('SELECT * FROM bot_state ORDER BY updated_at DESC LIMIT 20').all();
+  res.json({ events: debugLog.slice().reverse(), states });
+});
+
 // Webhook verification (GET) - Meta llama esto una vez para confirmar la URL
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
@@ -413,9 +431,10 @@ app.post('/webhook', async (req, res) => {
     const change = entry?.changes?.[0];
     const value = change?.value;
     const msg = value?.messages?.[0];
+    logDebug({ kind: 'webhook_in', hasMsg: !!msg, msgType: msg?.type, from: msg?.from });
     if (!msg) return;
 
-    if (processedMessages.has(msg.id)) return;
+    if (processedMessages.has(msg.id)) { logDebug({ kind: 'dedup_skip', id: msg.id }); return; }
     processedMessages.add(msg.id);
     if (processedMessages.size > 500) {
       const first = processedMessages.values().next().value;
