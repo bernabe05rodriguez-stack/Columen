@@ -135,6 +135,13 @@ app.get('/admin/logout', (req, res) => {
   res.redirect('/admin/login');
 });
 
+// Lightweight count endpoint for auto-refresh
+app.get('/admin/count', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const { c } = db.prepare('SELECT COUNT(*) as c FROM consultas').get();
+  res.json({ count: c });
+});
+
 // --- Admin dashboard ---
 app.get('/admin', (req, res) => {
   if (!isAuthenticated(req)) return res.redirect('/admin/login');
@@ -198,6 +205,19 @@ app.get('/admin', (req, res) => {
     <tbody>${rows}</tbody>
   </table>`}
 </div>
+<script>
+(function(){
+  const baseline = ${total};
+  setInterval(async () => {
+    try {
+      const r = await fetch('/admin/count', { credentials: 'same-origin' });
+      if (!r.ok) return;
+      const { count } = await r.json();
+      if (count !== baseline) location.reload();
+    } catch {}
+  }, 5000);
+})();
+</script>
 </body></html>`);
 });
 
