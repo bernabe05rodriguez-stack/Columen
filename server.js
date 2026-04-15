@@ -47,6 +47,19 @@ db.exec(`
   );
 `);
 
+db.exec(`CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at DATETIME DEFAULT (datetime('now','localtime')))`);
+function runMigration(name, fn) {
+  const existing = db.prepare('SELECT name FROM _migrations WHERE name = ?').get(name);
+  if (existing) return;
+  fn();
+  db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(name);
+  console.log('[migration] applied:', name);
+}
+// Pre-existing rows were stored in UTC (before TZ was set). Shift them -3h to Argentina time.
+runMigration('fix_tz_argentina_2026_04', () => {
+  db.prepare("UPDATE consultas SET created_at = datetime(created_at, '-3 hours')").run();
+});
+
 // Cleanup old sessions (older than 24h)
 db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
 
@@ -146,10 +159,30 @@ app.get('/admin/count', (req, res) => {
 app.get('/admin', (req, res) => {
   if (!isAuthenticated(req)) return res.redirect('/admin/login');
 
-  const consultas = db.prepare('SELECT * FROM consultas ORDER BY created_at DESC').all();
+  const f = {
+    q: (req.query.q || '').trim(),
+    area: (req.query.area || '').trim(),
+    desde: (req.query.desde || '').trim(),
+    hasta: (req.query.hasta || '').trim(),
+  };
+  const where = [];
+  const params = [];
+  if (f.q) {
+    where.push('(nombre LIKE ? OR dni LIKE ? OR email LIKE ? OR telefono LIKE ? OR consulta LIKE ?)');
+    const like = `%${f.q}%`;
+    params.push(like, like, like, like, like);
+  }
+  if (f.area) { where.push('LOWER(area) LIKE ?'); params.push(`%${f.area.toLowerCase()}%`); }
+  if (f.desde) { where.push('date(created_at) >= date(?)'); params.push(f.desde); }
+  if (f.hasta) { where.push('date(created_at) <= date(?)'); params.push(f.hasta); }
+  const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+
+  const consultas = db.prepare(`SELECT * FROM consultas ${whereSql} ORDER BY created_at DESC`).all(...params);
   const totalJuridico = db.prepare("SELECT COUNT(*) as c FROM consultas WHERE LOWER(area) LIKE '%juridic%'").get().c;
   const totalNotarial = db.prepare("SELECT COUNT(*) as c FROM consultas WHERE LOWER(area) LIKE '%notarial%'").get().c;
+  const totalAll = db.prepare('SELECT COUNT(*) as c FROM consultas').get().c;
   const total = consultas.length;
+  const filtered = total !== totalAll;
 
   const rows = consultas.map(c => `
     <tr>
@@ -188,18 +221,43 @@ app.get('/admin', (req, res) => {
   .badge-n{background:#fef3e0;color:#8a6d2b}
   .consulta-cell{max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .empty{text-align:center;padding:60px;color:#999;font-size:16px}
+  .filters{padding:0 28px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .filters .f{display:flex;flex-direction:column;gap:4px}
+  .filters label{font-size:11px;color:#8a6d2b;text-transform:uppercase;letter-spacing:.08em;font-weight:500}
+  .filters input,.filters select{padding:8px 12px;border:1px solid #ddd6c4;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;outline:none;min-width:140px}
+  .filters input:focus,.filters select:focus{border-color:#8a6d2b}
+  .filters .btn{padding:9px 18px;background:#1c1c1c;color:#f4f0e4;border:none;border-radius:999px;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+  .filters .btn:hover{background:#2a2a2a}
+  .filters .btn.ghost{background:transparent;color:#1c1c1c;border:1px solid #ddd6c4}
+  .filters .btn.ghost:hover{background:#f4f0e4}
+  .filter-info{padding:0 28px 8px;font-size:13px;color:#8a6d2b}
 </style></head><body>
 <div class="topbar">
   <h1>COLUMEN</h1>
   <div><span style="color:#999;margin-right:16px">Admin</span><a href="/admin/logout">Salir</a></div>
 </div>
 <div class="stats">
-  <div class="stat"><div class="num">${total}</div><div class="label">Total consultas</div></div>
+  <div class="stat"><div class="num">${totalAll}</div><div class="label">Total consultas</div></div>
   <div class="stat"><div class="num">${totalJuridico}</div><div class="label">Juridico</div></div>
   <div class="stat"><div class="num">${totalNotarial}</div><div class="label">Notarial</div></div>
 </div>
+<form class="filters" method="get" action="/admin">
+  <div class="f"><label>Buscar</label><input type="text" name="q" value="${escapeHtml(f.q)}" placeholder="Nombre, DNI, email, tel, texto..."></div>
+  <div class="f"><label>Area</label>
+    <select name="area">
+      <option value="">Todas</option>
+      <option value="juridico" ${f.area === 'juridico' ? 'selected' : ''}>Juridico</option>
+      <option value="notarial" ${f.area === 'notarial' ? 'selected' : ''}>Notarial</option>
+    </select>
+  </div>
+  <div class="f"><label>Desde</label><input type="date" name="desde" value="${escapeHtml(f.desde)}"></div>
+  <div class="f"><label>Hasta</label><input type="date" name="hasta" value="${escapeHtml(f.hasta)}"></div>
+  <button type="submit" class="btn">Filtrar</button>
+  ${filtered ? '<a href="/admin" class="btn ghost">Limpiar</a>' : ''}
+</form>
+${filtered ? `<div class="filter-info">Mostrando ${total} de ${totalAll} consultas</div>` : ''}
 <div class="table-wrap">
-  ${total === 0 ? '<div class="empty">No hay consultas aun</div>' : `
+  ${total === 0 ? `<div class="empty">${filtered ? 'No hay resultados con esos filtros' : 'No hay consultas aun'}</div>` : `
   <table>
     <thead><tr><th>#</th><th>Fecha</th><th>Telefono</th><th>Area</th><th>Nombre</th><th>DNI</th><th>Email</th><th>Consulta</th></tr></thead>
     <tbody>${rows}</tbody>
@@ -207,7 +265,7 @@ app.get('/admin', (req, res) => {
 </div>
 <script>
 (function(){
-  const baseline = ${total};
+  const baseline = ${totalAll};
   setInterval(async () => {
     try {
       const r = await fetch('/admin/count', { credentials: 'same-origin' });
