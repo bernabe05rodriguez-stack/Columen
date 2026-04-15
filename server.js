@@ -10,8 +10,11 @@ const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'columen2026';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 
-// Database
-const db = new Database('/data/columen.db');
+// Database - use /data if exists (Docker volume), fallback to ./data
+const fs = require('fs');
+const DB_DIR = fs.existsSync('/data') ? '/data' : './data';
+if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+const db = new Database(path.join(DB_DIR, 'columen.db'));
 db.pragma('journal_mode = WAL');
 db.exec(`
   CREATE TABLE IF NOT EXISTS consultas (
