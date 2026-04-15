@@ -1,4 +1,44 @@
-# Columen - Setup Bot WhatsApp con Kapso
+# Columen - Setup Bot WhatsApp (Meta Cloud API directo)
+
+> Kapso fue eliminado. El bot ahora corre en `server.js` conectado directo a la Graph API de Meta.
+
+## Arquitectura
+
+```
+Usuario en web → wa.me/5492617571910 → Meta Cloud API
+  → webhook POST /webhook a server.js
+  → server envía 2 botones (Jurídico / Notarial)
+  → usuario toca botón → server envía link a /consulta?area=X&tel=Y
+  → usuario llena form web → POST /consulta → SQLite → /admin
+```
+
+## Env vars necesarias en EasyPanel
+
+| Variable | Valor |
+|---|---|
+| `WHATSAPP_TOKEN` | Token de Meta (ver abajo) |
+| `WHATSAPP_PHONE_ID` | `1087869691071322` |
+| `WHATSAPP_VERIFY_TOKEN` | string random que elegís (ej: `columen-verify-2026`) |
+| `PUBLIC_URL` | `https://redhawk-columen.bm6z1s.easypanel.host` |
+
+## Configurar webhook en Meta
+
+1. developers.facebook.com → app "Columen" → WhatsApp → Configuración → Webhooks
+2. Callback URL: `https://redhawk-columen.bm6z1s.easypanel.host/webhook`
+3. Verify token: el mismo que pusiste en `WHATSAPP_VERIFY_TOKEN`
+4. Verificar y suscribirse al campo **messages**
+
+## Token permanente (para producción)
+
+El token de API Setup dura 24h. Para que ande siempre, generar System User Token:
+1. business.facebook.com/settings/system-users → crear system user "columen-api" (admin)
+2. Asignarle la WABA Columen con control total
+3. Generar token: app "Columen", caducidad **Nunca**, permisos `whatsapp_business_management` + `whatsapp_business_messaging`
+4. Pegarlo en `WHATSAPP_TOKEN` en EasyPanel y redeployar
+
+---
+
+# Setup viejo con Kapso (DEPRECADO - no usar)
 
 ## Arquitectura
 

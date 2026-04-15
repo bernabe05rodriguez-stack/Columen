@@ -10,6 +10,11 @@ const ADMIN_USER = process.env.ADMIN_USER || 'admin';
 const ADMIN_PASS = process.env.ADMIN_PASS || 'columen2026';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 
+const WA_TOKEN = process.env.WHATSAPP_TOKEN || '';
+const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID || '';
+const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'columen-verify-2026';
+const PUBLIC_URL = process.env.PUBLIC_URL || 'https://redhawk-columen.bm6z1s.easypanel.host';
+
 // Database - use /data if exists (Docker volume), fallback to ./data
 const fs = require('fs');
 const DB_DIR = fs.existsSync('/data') ? '/data' : './data';
@@ -30,6 +35,15 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
     token TEXT PRIMARY KEY,
     created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+  );
+  CREATE TABLE IF NOT EXISTS bot_state (
+    telefono TEXT PRIMARY KEY,
+    step TEXT,
+    area TEXT,
+    nombre TEXT,
+    dni TEXT,
+    email TEXT,
+    updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
   );
 `);
 
@@ -258,6 +272,174 @@ app.post('/consulta', (req, res) => {
     telefono || '', area || '', nombre || '', dni || '', email || '', consulta || ''
   );
   res.redirect(`/consulta?sent=1`);
+});
+
+// --- WhatsApp bot (Cloud API directo, sin Kapso) ---
+const processedMessages = new Set();
+
+async function waSend(payload) {
+  if (!WA_TOKEN || !WA_PHONE_ID) {
+    console.error('[WA] Missing WHATSAPP_TOKEN or WHATSAPP_PHONE_ID env vars');
+    return;
+  }
+  try {
+    const res = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok) console.error('[WA] send error', JSON.stringify(data));
+    return data;
+  } catch (err) {
+    console.error('[WA] fetch failed', err.message);
+  }
+}
+
+function sendWelcomeButtons(to) {
+  return waSend({
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'interactive',
+    interactive: {
+      type: 'button',
+      body: { text: 'Hola! Bienvenido a *COLUMEN* - Estudio Legal & Notarial.\n\nPara orientarte mejor, seleccioná el área de tu consulta:' },
+      action: {
+        buttons: [
+          { type: 'reply', reply: { id: 'area_juridico', title: 'Jurídico' } },
+          { type: 'reply', reply: { id: 'area_notarial', title: 'Notarial' } },
+        ],
+      },
+    },
+  });
+}
+
+function sendText(to, body) {
+  return waSend({
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'text',
+    text: { body },
+  });
+}
+
+// --- State machine del bot ---
+const getState = (tel) => db.prepare('SELECT * FROM bot_state WHERE telefono = ?').get(tel);
+const setState = (tel, fields) => {
+  const existing = getState(tel);
+  if (existing) {
+    const keys = Object.keys(fields);
+    const sets = keys.map(k => `${k} = ?`).join(', ') + ", updated_at = datetime('now','localtime')";
+    db.prepare(`UPDATE bot_state SET ${sets} WHERE telefono = ?`).run(...keys.map(k => fields[k]), tel);
+  } else {
+    db.prepare('INSERT INTO bot_state (telefono, step, area, nombre, dni, email) VALUES (?,?,?,?,?,?)').run(
+      tel, fields.step || null, fields.area || null, fields.nombre || null, fields.dni || null, fields.email || null
+    );
+  }
+};
+const clearState = (tel) => db.prepare('DELETE FROM bot_state WHERE telefono = ?').run(tel);
+
+async function handleButtonReply(from, buttonId) {
+  let area = null;
+  if (buttonId === 'area_juridico') area = 'juridico';
+  if (buttonId === 'area_notarial') area = 'notarial';
+  if (!area) return;
+  setState(from, { step: 'nombre', area });
+  const label = area === 'juridico' ? 'Jurídico' : 'Notarial';
+  await sendText(from, `Perfecto! Consulta *${label}* seleccionada.\n\nVamos a tomar tus datos. Por favor, escribí tu *nombre completo*:`);
+}
+
+async function handleTextInFlow(from, text) {
+  const state = getState(from);
+  if (!state || !state.step) {
+    return sendWelcomeButtons(from);
+  }
+  const clean = (text || '').trim();
+  if (!clean) return;
+
+  if (state.step === 'nombre') {
+    if (clean.length < 2) return sendText(from, 'El nombre parece muy corto. Por favor escribí tu nombre completo:');
+    setState(from, { step: 'dni', nombre: clean });
+    return sendText(from, `Gracias ${clean.split(' ')[0]}.\n\nAhora tu *número de DNI* (solo números):`);
+  }
+
+  if (state.step === 'dni') {
+    const digits = clean.replace(/[.\s-]/g, '');
+    if (!/^\d{7,10}$/.test(digits)) {
+      return sendText(from, 'DNI inválido. Escribí solo los números (7 a 10 dígitos):');
+    }
+    setState(from, { step: 'email', dni: digits });
+    return sendText(from, 'Perfecto.\n\nAhora tu *email*:');
+  }
+
+  if (state.step === 'email') {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
+      return sendText(from, 'El email no parece válido. Probá de nuevo:');
+    }
+    setState(from, { step: 'consulta', email: clean });
+    return sendText(from, 'Último paso.\n\n*Contanos brevemente tu consulta*:');
+  }
+
+  if (state.step === 'consulta') {
+    if (clean.length < 5) return sendText(from, 'Por favor describí un poco más tu consulta:');
+    const final = getState(from);
+    db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?,?,?,?,?,?)').run(
+      from, final.area || '', final.nombre || '', final.dni || '', final.email || '', clean
+    );
+    clearState(from);
+    return sendText(from, `Gracias ${final.nombre?.split(' ')[0] || ''}! Tu consulta de tipo *${final.area === 'juridico' ? 'Jurídico' : 'Notarial'}* fue registrada correctamente.\n\nUn profesional de COLUMEN se va a comunicar con vos a la brevedad.`);
+  }
+}
+
+// Webhook verification (GET) - Meta llama esto una vez para confirmar la URL
+app.get('/webhook', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+  if (mode === 'subscribe' && token === WA_VERIFY_TOKEN) {
+    console.log('[WA] webhook verified');
+    return res.status(200).send(challenge);
+  }
+  res.sendStatus(403);
+});
+
+// Webhook receiver (POST) - mensajes entrantes de WhatsApp
+app.post('/webhook', async (req, res) => {
+  res.sendStatus(200);
+  try {
+    const entry = req.body.entry?.[0];
+    const change = entry?.changes?.[0];
+    const value = change?.value;
+    const msg = value?.messages?.[0];
+    if (!msg) return;
+
+    if (processedMessages.has(msg.id)) return;
+    processedMessages.add(msg.id);
+    if (processedMessages.size > 500) {
+      const first = processedMessages.values().next().value;
+      processedMessages.delete(first);
+    }
+
+    const from = msg.from;
+    console.log('[WA] msg from', from, 'type', msg.type);
+
+    if (msg.type === 'interactive' && msg.interactive?.type === 'button_reply') {
+      return handleButtonReply(from, msg.interactive.button_reply.id);
+    }
+
+    if (msg.type === 'text') {
+      const body = msg.text?.body || '';
+      const state = getState(from);
+      if (state && state.step) {
+        return handleTextInFlow(from, body);
+      }
+      return sendWelcomeButtons(from);
+    }
+  } catch (err) {
+    console.error('[WA] webhook handler error', err);
+  }
 });
 
 // --- Serve landing page ---
