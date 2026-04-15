@@ -51,9 +51,11 @@ async function initDb() {
   console.log('[db] initialized');
 }
 
-initDb().catch(err => {
-  console.error('[FATAL] DB init failed:', err);
-  process.exit(1);
+let dbReady = false;
+let dbInitError = null;
+initDb().then(() => { dbReady = true; }).catch(err => {
+  dbInitError = err.message + '\n' + err.stack;
+  console.error('[DB init failed]', err);
 });
 
 // Helper: format timestamp to Argentina local string for display
@@ -481,8 +483,22 @@ async function handleTextInFlow(from, text) {
 // Debug endpoint - muestra ultimos eventos del bot
 app.get('/bot-debug', async (req, res) => {
   if (req.query.key !== 'columen-debug-2026') return res.status(403).json({ error: 'forbidden' });
-  const { rows: states } = await q('SELECT * FROM bot_state ORDER BY updated_at DESC LIMIT 20');
-  res.json({ events: debugLog.slice().reverse(), states });
+  try {
+    const { rows: states } = await q('SELECT * FROM bot_state ORDER BY updated_at DESC LIMIT 20');
+    res.json({ dbReady, events: debugLog.slice().reverse(), states });
+  } catch (err) {
+    res.json({ dbReady, dbInitError, events: debugLog.slice().reverse(), dbError: err.message });
+  }
+});
+
+// Health + db connection test (public)
+app.get('/health', async (req, res) => {
+  try {
+    const { rows } = await q('SELECT 1 as ok');
+    res.json({ ok: true, db: rows[0].ok === 1, dbReady, DATABASE_URL_host: (DATABASE_URL || '').split('@')[1]?.split('/')[0] || 'unset' });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message, code: err.code, dbInitError, DATABASE_URL_host: (DATABASE_URL || '').split('@')[1]?.split('/')[0] || 'unset' });
+  }
 });
 
 // Webhook verification (GET) - Meta llama esto una vez para confirmar la URL
