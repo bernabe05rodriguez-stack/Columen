@@ -57,6 +57,7 @@ function isAuthenticated(req) {
 // --- Webhook: receives data from Kapso ---
 app.post('/api/webhook', (req, res) => {
   const data = req.body;
+  console.log('Webhook received:', JSON.stringify(data));
   const stmt = db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?, ?, ?, ?, ?, ?)');
   stmt.run(
     data.telefono || '',
