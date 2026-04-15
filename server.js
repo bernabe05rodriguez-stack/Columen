@@ -187,6 +187,79 @@ app.get('/admin', (req, res) => {
 </body></html>`);
 });
 
+// --- Formulario de consulta (abierto desde WhatsApp) ---
+app.get('/consulta', (req, res) => {
+  const area = req.query.area || '';
+  const tel = req.query.tel || '';
+  const sent = req.query.sent === '1';
+  res.send(`<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Consulta - COLUMEN</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:#f4f0e4;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:#fff;border-radius:18px;padding:36px 28px;width:100%;max-width:420px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+  .logo{text-align:center;margin-bottom:6px}
+  .logo span{font-family:serif;font-size:22px;letter-spacing:.2em;color:#1c1c1c}
+  .area-badge{display:block;text-align:center;margin-bottom:24px}
+  .area-badge span{background:${area.toLowerCase().includes('juridic') ? '#e8f0fe' : '#fef3e0'};color:${area.toLowerCase().includes('juridic') ? '#1a5cb0' : '#8a6d2b'};padding:5px 16px;border-radius:999px;font-size:13px;font-weight:500}
+  h2{font-family:serif;font-size:20px;color:#1c1c1c;margin-bottom:4px;text-align:center}
+  .sub{color:#8a6d2b;font-size:12px;text-align:center;margin-bottom:24px;letter-spacing:.08em;text-transform:uppercase}
+  label{display:block;font-size:13px;font-weight:500;color:#555;margin-bottom:5px}
+  input,textarea{width:100%;padding:12px;border:1px solid #ddd6c4;border-radius:10px;font-size:15px;margin-bottom:14px;outline:none;font-family:inherit}
+  input:focus,textarea:focus{border-color:#8a6d2b;box-shadow:0 0 0 3px rgba(138,109,43,.1)}
+  textarea{resize:vertical;min-height:90px}
+  button{width:100%;padding:14px;background:#1c1c1c;color:#f4f0e4;border:none;border-radius:999px;font-size:15px;font-weight:500;cursor:pointer;margin-top:4px}
+  button:hover{background:#2a2a2a}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .success{text-align:center;padding:40px 20px}
+  .success .check{font-size:48px;margin-bottom:16px}
+  .success h2{margin-bottom:12px}
+  .success p{color:#666;font-size:15px;line-height:1.5}
+</style></head><body>
+<div class="card">
+  ${sent ? `
+  <div class="success">
+    <div class="check">&#10003;</div>
+    <h2>Consulta enviada</h2>
+    <p>Gracias! Un profesional de COLUMEN te va a contactar a la brevedad.</p>
+    <p style="margin-top:16px;font-size:13px;color:#999">Ya podes cerrar esta ventana.</p>
+  </div>` : `
+  <div class="logo"><span>COLUMEN</span></div>
+  ${area ? '<div class="area-badge"><span>Consulta ' + escapeHtml(area) + '</span></div>' : ''}
+  <h2>Completa tus datos</h2>
+  <div class="sub">Te contactaremos a la brevedad</div>
+  <form method="POST" action="/consulta" id="formConsulta">
+    <input type="hidden" name="area" value="${escapeHtml(area)}">
+    <input type="hidden" name="telefono" value="${escapeHtml(tel)}">
+    <label>Nombre completo *</label>
+    <input type="text" name="nombre" required autocomplete="name">
+    <label>DNI *</label>
+    <input type="text" name="dni" required inputmode="numeric" pattern="[0-9.]{7,12}">
+    <label>Email *</label>
+    <input type="email" name="email" required autocomplete="email">
+    <label>Tu consulta *</label>
+    <textarea name="consulta" required placeholder="Describe brevemente tu consulta..."></textarea>
+    <button type="submit" id="btnEnviar">Enviar consulta</button>
+  </form>
+  <script>
+    document.getElementById('formConsulta').addEventListener('submit', function(){
+      document.getElementById('btnEnviar').disabled = true;
+      document.getElementById('btnEnviar').textContent = 'Enviando...';
+    });
+  </script>`}
+</div></body></html>`);
+});
+
+app.post('/consulta', (req, res) => {
+  const { telefono, area, nombre, dni, email, consulta } = req.body;
+  db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?, ?, ?, ?, ?, ?)').run(
+    telefono || '', area || '', nombre || '', dni || '', email || '', consulta || ''
+  );
+  res.redirect(`/consulta?sent=1`);
+});
+
 // --- Serve landing page ---
 app.use(express.static(path.join(__dirname, 'public')));
 
