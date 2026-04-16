@@ -1,7 +1,8 @@
 const express = require('express');
-const { Pool } = require('pg');
+const Database = require('better-sqlite3');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 80;
@@ -14,87 +15,91 @@ const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID || '';
 const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'columen-verify-2026';
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://redhawk-columen.bm6z1s.easypanel.host';
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.error('[FATAL] DATABASE_URL env var missing');
-  process.exit(1);
-}
-const pool = new Pool({ connectionString: DATABASE_URL });
-const q = (sql, params) => pool.query(sql, params);
-
-async function initDb() {
-  await q(`CREATE TABLE IF NOT EXISTS consultas (
-    id SERIAL PRIMARY KEY,
+// Database - use /data if exists (Docker volume), fallback to ./data
+const fs = require('fs');
+const DB_DIR = fs.existsSync('/data') ? '/data' : './data';
+if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
+const db = new Database(path.join(DB_DIR, 'columen.db'));
+db.pragma('journal_mode = WAL');
+db.exec(`
+  CREATE TABLE IF NOT EXISTS consultas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     telefono TEXT,
     area TEXT,
     nombre TEXT,
     dni TEXT,
     email TEXT,
     consulta TEXT,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-  )`);
-  await q(`CREATE TABLE IF NOT EXISTS sessions (
+    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+  );
+  CREATE TABLE IF NOT EXISTS sessions (
     token TEXT PRIMARY KEY,
-    created_at TIMESTAMPTZ DEFAULT NOW()
-  )`);
-  await q(`CREATE TABLE IF NOT EXISTS bot_state (
+    created_at DATETIME DEFAULT (datetime('now', 'localtime'))
+  );
+  CREATE TABLE IF NOT EXISTS bot_state (
     telefono TEXT PRIMARY KEY,
     step TEXT,
     area TEXT,
     nombre TEXT,
     dni TEXT,
     email TEXT,
-    updated_at TIMESTAMPTZ DEFAULT NOW()
-  )`);
-  await q(`CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ DEFAULT NOW())`);
-  await q(`DELETE FROM sessions WHERE created_at < NOW() - INTERVAL '1 day'`);
-  console.log('[db] initialized');
-}
+    updated_at DATETIME DEFAULT (datetime('now', 'localtime'))
+  );
+`);
 
-let dbReady = false;
-let dbInitError = null;
-initDb().then(() => { dbReady = true; }).catch(err => {
-  dbInitError = err.message + '\n' + err.stack;
-  console.error('[DB init failed]', err);
+db.exec(`CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at DATETIME DEFAULT (datetime('now','localtime')))`);
+function runMigration(name, fn) {
+  const existing = db.prepare('SELECT name FROM _migrations WHERE name = ?').get(name);
+  if (existing) return;
+  fn();
+  db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(name);
+  console.log('[migration] applied:', name);
+}
+// Pre-existing rows were stored in UTC (before TZ was set). Shift them -3h to Argentina time.
+runMigration('fix_tz_argentina_2026_04', () => {
+  db.prepare("UPDATE consultas SET created_at = datetime(created_at, '-3 hours')").run();
 });
 
-// Helper: format timestamp to Argentina local string for display
-function formatAR(ts) {
-  if (!ts) return '';
-  const d = new Date(ts);
-  return d.toLocaleString('sv-SE', { timeZone: 'America/Argentina/Buenos_Aires' }).replace('T', ' ').slice(0, 19);
-}
+// Cleanup old sessions (older than 24h)
+db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // --- Auth helpers ---
-async function createSession() {
+function createSession() {
   const token = crypto.randomBytes(32).toString('hex');
-  await q('INSERT INTO sessions (token) VALUES ($1)', [token]);
+  db.prepare('INSERT INTO sessions (token) VALUES (?)').run(token);
   return token;
 }
 
-async function isAuthenticated(req) {
+function isAuthenticated(req) {
   const token = req.cookies.session;
   if (!token) return false;
-  const { rows } = await q("SELECT token FROM sessions WHERE token = $1 AND created_at > NOW() - INTERVAL '1 day'", [token]);
-  return rows.length > 0;
+  const row = db.prepare("SELECT token FROM sessions WHERE token = ? AND created_at > datetime('now', '-1 day')").get(token);
+  return !!row;
 }
 
-// --- Webhook: legacy endpoint (por si algo quedó apuntando aca) ---
-app.post('/api/webhook', async (req, res) => {
-  const d = req.body || {};
-  console.log('Webhook received:', JSON.stringify(d));
-  await q('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES ($1,$2,$3,$4,$5,$6)',
-    [d.telefono || '', d.area || '', d.nombre || '', d.dni || '', d.email || '', d.consulta || '']);
+// --- Webhook: receives data from Kapso ---
+app.post('/api/webhook', (req, res) => {
+  const data = req.body;
+  console.log('Webhook received:', JSON.stringify(data));
+  const stmt = db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?, ?, ?, ?, ?, ?)');
+  stmt.run(
+    data.telefono || '',
+    data.area || '',
+    data.nombre || '',
+    data.dni || '',
+    data.email || '',
+    data.consulta || ''
+  );
   res.json({ status: 'ok' });
 });
 
 // --- Admin login page ---
-app.get('/admin/login', async (req, res) => {
-  if (await isAuthenticated(req)) return res.redirect('/admin');
+app.get('/admin/login', (req, res) => {
+  if (isAuthenticated(req)) return res.redirect('/admin');
   const error = req.query.error ? '<p style="color:#e74c3c;margin-bottom:16px">Usuario o contraseña incorrectos</p>' : '';
   res.send(`<!DOCTYPE html>
 <html lang="es"><head>
@@ -126,33 +131,33 @@ app.get('/admin/login', async (req, res) => {
 </div></body></html>`);
 });
 
-app.post('/admin/login', async (req, res) => {
+app.post('/admin/login', (req, res) => {
   const { username, password } = req.body;
   if (username === ADMIN_USER && password === ADMIN_PASS) {
-    const token = await createSession();
+    const token = createSession();
     res.cookie('session', token, { httpOnly: true, maxAge: 86400000, sameSite: 'lax' });
     return res.redirect('/admin');
   }
   res.redirect('/admin/login?error=1');
 });
 
-app.get('/admin/logout', async (req, res) => {
+app.get('/admin/logout', (req, res) => {
   const token = req.cookies.session;
-  if (token) await q('DELETE FROM sessions WHERE token = $1', [token]);
+  if (token) db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
   res.clearCookie('session');
   res.redirect('/admin/login');
 });
 
 // Lightweight count endpoint for auto-refresh
-app.get('/admin/count', async (req, res) => {
-  if (!(await isAuthenticated(req))) return res.status(401).json({ error: 'unauth' });
-  const { rows } = await q('SELECT COUNT(*)::int as c FROM consultas');
-  res.json({ count: rows[0].c });
+app.get('/admin/count', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const { c } = db.prepare('SELECT COUNT(*) as c FROM consultas').get();
+  res.json({ count: c });
 });
 
 // --- Admin dashboard ---
-app.get('/admin', async (req, res) => {
-  if (!(await isAuthenticated(req))) return res.redirect('/admin/login');
+app.get('/admin', (req, res) => {
+  if (!isAuthenticated(req)) return res.redirect('/admin/login');
 
   const f = {
     q: (req.query.q || '').trim(),
@@ -162,27 +167,27 @@ app.get('/admin', async (req, res) => {
   };
   const where = [];
   const params = [];
-  let i = 1;
   if (f.q) {
-    where.push(`(nombre ILIKE $${i} OR dni ILIKE $${i} OR email ILIKE $${i} OR telefono ILIKE $${i} OR consulta ILIKE $${i})`);
-    params.push(`%${f.q}%`); i++;
+    where.push('(nombre LIKE ? OR dni LIKE ? OR email LIKE ? OR telefono LIKE ? OR consulta LIKE ?)');
+    const like = `%${f.q}%`;
+    params.push(like, like, like, like, like);
   }
-  if (f.area) { where.push(`LOWER(area) LIKE $${i}`); params.push(`%${f.area.toLowerCase()}%`); i++; }
-  if (f.desde) { where.push(`(created_at AT TIME ZONE 'America/Argentina/Buenos_Aires')::date >= $${i}::date`); params.push(f.desde); i++; }
-  if (f.hasta) { where.push(`(created_at AT TIME ZONE 'America/Argentina/Buenos_Aires')::date <= $${i}::date`); params.push(f.hasta); i++; }
+  if (f.area) { where.push('LOWER(area) LIKE ?'); params.push(`%${f.area.toLowerCase()}%`); }
+  if (f.desde) { where.push('date(created_at) >= date(?)'); params.push(f.desde); }
+  if (f.hasta) { where.push('date(created_at) <= date(?)'); params.push(f.hasta); }
   const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
 
-  const { rows: consultas } = await q(`SELECT * FROM consultas ${whereSql} ORDER BY created_at DESC`, params);
-  const { rows: [{ c: totalJuridico }] } = await q("SELECT COUNT(*)::int as c FROM consultas WHERE LOWER(area) LIKE '%juridic%'");
-  const { rows: [{ c: totalNotarial }] } = await q("SELECT COUNT(*)::int as c FROM consultas WHERE LOWER(area) LIKE '%notarial%'");
-  const { rows: [{ c: totalAll }] } = await q('SELECT COUNT(*)::int as c FROM consultas');
+  const consultas = db.prepare(`SELECT * FROM consultas ${whereSql} ORDER BY created_at DESC`).all(...params);
+  const totalJuridico = db.prepare("SELECT COUNT(*) as c FROM consultas WHERE LOWER(area) LIKE '%juridic%'").get().c;
+  const totalNotarial = db.prepare("SELECT COUNT(*) as c FROM consultas WHERE LOWER(area) LIKE '%notarial%'").get().c;
+  const totalAll = db.prepare('SELECT COUNT(*) as c FROM consultas').get().c;
   const total = consultas.length;
   const filtered = total !== totalAll;
 
   const rows = consultas.map(c => `
     <tr>
       <td>${c.id}</td>
-      <td>${escapeHtml(formatAR(c.created_at))}</td>
+      <td>${escapeHtml(c.created_at || '')}</td>
       <td>${escapeHtml(c.telefono)}</td>
       <td><span class="badge ${c.area?.toLowerCase().includes('juridic') ? 'badge-j' : 'badge-n'}">${escapeHtml(c.area)}</span></td>
       <td>${escapeHtml(c.nombre)}</td>
@@ -339,10 +344,11 @@ app.get('/consulta', (req, res) => {
 </div></body></html>`);
 });
 
-app.post('/consulta', async (req, res) => {
+app.post('/consulta', (req, res) => {
   const { telefono, area, nombre, dni, email, consulta } = req.body;
-  await q('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES ($1,$2,$3,$4,$5,$6)',
-    [telefono || '', area || '', nombre || '', dni || '', email || '', consulta || '']);
+  db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?, ?, ?, ?, ?, ?)').run(
+    telefono || '', area || '', nombre || '', dni || '', email || '', consulta || ''
+  );
   res.redirect(`/consulta?sent=1`);
 });
 
@@ -409,38 +415,33 @@ function sendText(to, body) {
 }
 
 // --- State machine del bot ---
-async function getState(tel) {
-  const { rows } = await q('SELECT * FROM bot_state WHERE telefono = $1', [tel]);
-  return rows[0] || null;
-}
-async function setState(tel, fields) {
-  const existing = await getState(tel);
+const getState = (tel) => db.prepare('SELECT * FROM bot_state WHERE telefono = ?').get(tel);
+const setState = (tel, fields) => {
+  const existing = getState(tel);
   if (existing) {
     const keys = Object.keys(fields);
-    const sets = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
-    const values = keys.map(k => fields[k]);
-    await q(`UPDATE bot_state SET ${sets}, updated_at = NOW() WHERE telefono = $${keys.length + 1}`, [...values, tel]);
+    const sets = keys.map(k => `${k} = ?`).join(', ') + ", updated_at = datetime('now','localtime')";
+    db.prepare(`UPDATE bot_state SET ${sets} WHERE telefono = ?`).run(...keys.map(k => fields[k]), tel);
   } else {
-    await q('INSERT INTO bot_state (telefono, step, area, nombre, dni, email) VALUES ($1,$2,$3,$4,$5,$6)',
-      [tel, fields.step || null, fields.area || null, fields.nombre || null, fields.dni || null, fields.email || null]);
+    db.prepare('INSERT INTO bot_state (telefono, step, area, nombre, dni, email) VALUES (?,?,?,?,?,?)').run(
+      tel, fields.step || null, fields.area || null, fields.nombre || null, fields.dni || null, fields.email || null
+    );
   }
-}
-async function clearState(tel) {
-  await q('DELETE FROM bot_state WHERE telefono = $1', [tel]);
-}
+};
+const clearState = (tel) => db.prepare('DELETE FROM bot_state WHERE telefono = ?').run(tel);
 
 async function handleButtonReply(from, buttonId) {
   let area = null;
   if (buttonId === 'area_juridico') area = 'juridico';
   if (buttonId === 'area_notarial') area = 'notarial';
   if (!area) return;
-  await setState(from, { step: 'nombre', area });
+  setState(from, { step: 'nombre', area });
   const label = area === 'juridico' ? 'Jurídico' : 'Notarial';
   await sendText(from, `Perfecto! Consulta *${label}* seleccionada.\n\nVamos a tomar tus datos. Por favor, escribí tu *nombre completo*:`);
 }
 
 async function handleTextInFlow(from, text) {
-  const state = await getState(from);
+  const state = getState(from);
   if (!state || !state.step) {
     return sendWelcomeButtons(from);
   }
@@ -449,7 +450,7 @@ async function handleTextInFlow(from, text) {
 
   if (state.step === 'nombre') {
     if (clean.length < 2) return sendText(from, 'El nombre parece muy corto. Por favor escribí tu nombre completo:');
-    await setState(from, { step: 'dni', nombre: clean });
+    setState(from, { step: 'dni', nombre: clean });
     return sendText(from, `Gracias ${clean.split(' ')[0]}.\n\nAhora tu *número de DNI* (solo números):`);
   }
 
@@ -458,7 +459,7 @@ async function handleTextInFlow(from, text) {
     if (!/^\d{7,10}$/.test(digits)) {
       return sendText(from, 'DNI inválido. Escribí solo los números (7 a 10 dígitos):');
     }
-    await setState(from, { step: 'email', dni: digits });
+    setState(from, { step: 'email', dni: digits });
     return sendText(from, 'Perfecto.\n\nAhora tu *email*:');
   }
 
@@ -466,39 +467,26 @@ async function handleTextInFlow(from, text) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
       return sendText(from, 'El email no parece válido. Probá de nuevo:');
     }
-    await setState(from, { step: 'consulta', email: clean });
+    setState(from, { step: 'consulta', email: clean });
     return sendText(from, 'Último paso.\n\n*Contanos brevemente tu consulta*:');
   }
 
   if (state.step === 'consulta') {
     if (clean.length < 5) return sendText(from, 'Por favor describí un poco más tu consulta:');
-    const final = await getState(from);
-    await q('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES ($1,$2,$3,$4,$5,$6)',
-      [from, final.area || '', final.nombre || '', final.dni || '', final.email || '', clean]);
-    await clearState(from);
+    const final = getState(from);
+    db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?,?,?,?,?,?)').run(
+      from, final.area || '', final.nombre || '', final.dni || '', final.email || '', clean
+    );
+    clearState(from);
     return sendText(from, `Gracias ${final.nombre?.split(' ')[0] || ''}! Tu consulta de tipo *${final.area === 'juridico' ? 'Jurídico' : 'Notarial'}* fue registrada correctamente.\n\nUn profesional de COLUMEN se va a comunicar con vos a la brevedad.`);
   }
 }
 
 // Debug endpoint - muestra ultimos eventos del bot
-app.get('/bot-debug', async (req, res) => {
+app.get('/bot-debug', (req, res) => {
   if (req.query.key !== 'columen-debug-2026') return res.status(403).json({ error: 'forbidden' });
-  try {
-    const { rows: states } = await q('SELECT * FROM bot_state ORDER BY updated_at DESC LIMIT 20');
-    res.json({ dbReady, events: debugLog.slice().reverse(), states });
-  } catch (err) {
-    res.json({ dbReady, dbInitError, events: debugLog.slice().reverse(), dbError: err.message });
-  }
-});
-
-// Health + db connection test (public)
-app.get('/health', async (req, res) => {
-  try {
-    const { rows } = await q('SELECT 1 as ok');
-    res.json({ ok: true, db: rows[0].ok === 1, dbReady, DATABASE_URL_host: (DATABASE_URL || '').split('@')[1]?.split('/')[0] || 'unset' });
-  } catch (err) {
-    res.status(500).json({ ok: false, error: err.message, code: err.code, dbInitError, DATABASE_URL_host: (DATABASE_URL || '').split('@')[1]?.split('/')[0] || 'unset' });
-  }
+  const states = db.prepare('SELECT * FROM bot_state ORDER BY updated_at DESC LIMIT 20').all();
+  res.json({ events: debugLog.slice().reverse(), states });
 });
 
 // Webhook verification (GET) - Meta llama esto una vez para confirmar la URL
@@ -540,7 +528,7 @@ app.post('/webhook', async (req, res) => {
 
     if (msg.type === 'text') {
       const body = msg.text?.body || '';
-      const state = await getState(from);
+      const state = getState(from);
       if (state && state.step) {
         return handleTextInFlow(from, body);
       }
