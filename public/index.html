@@ -60,8 +60,9 @@
   .btn-ghost:hover{background:var(--ink);color:var(--cream);border-color:var(--ink)}
 
   /* Logo */
-  .logo{height:42px;width:auto;object-fit:contain}
-  .logo-footer{height:36px;filter:brightness(0) invert(1);opacity:.9}
+  .logo-wrap{display:flex;align-items:center;gap:0;color:var(--cream)}
+  .logo-wrap svg{height:44px;width:auto}
+  .foot .logo-wrap svg{height:36px}
 
   /* Header */
   header{position:sticky;top:0;z-index:50;background:rgba(26,39,68,.97);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border-bottom:1px solid rgba(255,255,255,.06)}
@@ -211,8 +212,13 @@
 
 <header>
   <div class="container nav">
-    <a href="#">
-      <img src="logo-columen.jpg" alt="Columen Legal &amp; Notarial" class="logo" style="filter:brightness(0) invert(1);opacity:.95">
+    <a href="#" class="logo-wrap">
+      <svg viewBox="0 0 360 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(40,40)"><path d="M16,-1.5 A17,17 0 1,0 12,14" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M14,13 A17,17 0 0,0 16,-1.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" opacity=".35" transform="translate(1.5,1)"/></g>
+        <line x1="78" y1="16" x2="78" y2="64" stroke="currentColor" opacity=".2" stroke-width="1"/>
+        <text x="96" y="46" font-family="'Montserrat','Helvetica Neue',sans-serif" font-size="28" font-weight="400" letter-spacing="8" fill="currentColor">COLUMEN</text>
+        <text x="96" y="64" font-family="'Montserrat','Helvetica Neue',sans-serif" font-size="10.5" font-weight="400" letter-spacing="4.5" fill="currentColor" opacity=".55">LEGAL &amp; NOTARIAL</text>
+      </svg>
     </a>
     <nav>
       <ul>
@@ -409,8 +415,13 @@
 
 <footer>
   <div class="container foot">
-    <a href="#">
-      <img src="logo-columen.jpg" alt="Columen Legal &amp; Notarial" class="logo logo-footer">
+    <a href="#" class="logo-wrap">
+      <svg viewBox="0 0 360 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g transform="translate(40,40)"><path d="M16,-1.5 A17,17 0 1,0 12,14" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M14,13 A17,17 0 0,0 16,-1.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" opacity=".35" transform="translate(1.5,1)"/></g>
+        <line x1="78" y1="16" x2="78" y2="64" stroke="currentColor" opacity=".2" stroke-width="1"/>
+        <text x="96" y="46" font-family="'Montserrat','Helvetica Neue',sans-serif" font-size="28" font-weight="400" letter-spacing="8" fill="currentColor">COLUMEN</text>
+        <text x="96" y="64" font-family="'Montserrat','Helvetica Neue',sans-serif" font-size="10.5" font-weight="400" letter-spacing="4.5" fill="currentColor" opacity=".55">LEGAL &amp; NOTARIAL</text>
+      </svg>
     </a>
     <div class="foot-info">
       <div>Catamarca 170, Planta Baja, oficinas 8 y 10 · Ciudad de Mendoza</div>

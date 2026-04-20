@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 80" fill="none">
+  <!-- Isotipo: círculo abierto tipo "C" / columna abstracta -->
+  <g transform="translate(40,40)">
+    <path d="M16,-1.5 A17,17 0 1,0 12,14" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round"/>
+    <path d="M14,13 A17,17 0 0,0 16,-1.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" opacity=".35" transform="translate(1.5,1)"/>
+  </g>
+  <!-- Línea divisora -->
+  <line x1="78" y1="16" x2="78" y2="64" stroke="currentColor" opacity=".2" stroke-width="1"/>
+  <!-- COLUMEN -->
+  <text x="96" y="46" font-family="'Montserrat','Helvetica Neue',sans-serif" font-size="28" font-weight="400" letter-spacing="8" fill="currentColor">COLUMEN</text>
+  <!-- LEGAL & NOTARIAL -->
+  <text x="96" y="64" font-family="'Montserrat','Helvetica Neue',sans-serif" font-size="10.5" font-weight="400" letter-spacing="4.5" fill="currentColor" opacity=".55">LEGAL &amp; NOTARIAL</text>
+</svg>
