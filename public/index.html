@@ -12,180 +12,198 @@
 <style>
   :root{
     --navy:#1a2744;
-    --navy-light:#243356;
-    --navy-border:rgba(255,255,255,.1);
+    --navy-2:#1e2d4d;
+    --navy-light:#2a3d66;
+    --navy-border:rgba(255,255,255,.08);
     --cream:#f4f0e4;
-    --cream-2:#e8e1cf;
-    --cream-border:#ddd6c4;
+    --cream-2:#ece6d5;
+    --cream-3:#e4dcc8;
+    --cream-border:#d8d0bc;
     --ink:#1c1c1c;
     --ink-82:rgba(28,28,28,.82);
+    --ink-60:rgba(28,28,28,.6);
     --ink-40:rgba(28,28,28,.4);
     --ink-08:rgba(28,28,28,.08);
-    --muted:#5f5f5d;
+    --muted:#6b6b68;
     --gold:#8a6d2b;
     --gold-soft:#b8974a;
-    --gold-tint:rgba(138,109,43,.08);
-    --sh-card: rgba(0,0,0,.02) 0 0 0 1px, rgba(0,0,0,.04) 0 2px 6px, rgba(0,0,0,.10) 0 4px 12px;
-    --sh-hover: rgba(0,0,0,.03) 0 0 0 1px, rgba(0,0,0,.06) 0 8px 16px, rgba(0,0,0,.12) 0 20px 40px;
-    --sh-inset: rgba(255,255,255,.12) 0 .5px 0 0 inset, rgba(0,0,0,.2) 0 0 0 .5px inset, rgba(0,0,0,.05) 0 1px 2px 0;
+    --gold-light:#d4b87a;
+    --gold-tint:rgba(138,109,43,.07);
+    --radius:20px;
+    --sh-card:0 1px 2px rgba(0,0,0,.04),0 4px 12px rgba(0,0,0,.06);
+    --sh-card-hover:0 4px 12px rgba(0,0,0,.06),0 16px 40px rgba(0,0,0,.1);
+    --sh-elevated:0 8px 30px rgba(0,0,0,.08),0 2px 6px rgba(0,0,0,.04);
   }
   *{box-sizing:border-box;margin:0;padding:0}
-  html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
-  body{
-    font-family:'Inter',ui-sans-serif,system-ui,sans-serif;color:var(--ink);line-height:1.5;font-weight:400;
-    background:
-      radial-gradient(ellipse 1000px 700px at 10% 0%, rgba(184,151,74,.14), transparent 55%),
-      radial-gradient(ellipse 900px 600px at 90% 100%, rgba(90,110,140,.10), transparent 55%),
-      radial-gradient(ellipse 800px 600px at 50% 50%, rgba(210,180,140,.08), transparent 70%),
-      #eee8d9;
-    background-attachment:fixed;
-  }
-  ::selection{background:var(--gold);color:var(--cream)}
+  html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+  body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;color:var(--ink);line-height:1.6;font-weight:400;background:var(--cream);overflow-x:hidden}
+  ::selection{background:var(--navy);color:var(--cream)}
   a{color:inherit;text-decoration:none}
-  .container{max-width:1100px;margin:0 auto;padding:0 28px}
+  img{display:block;max-width:100%}
+  .container{max-width:1120px;margin:0 auto;padding:0 32px}
 
-  h1,h2,h3{font-family:'Fraunces',serif;color:var(--ink);font-weight:500;letter-spacing:-.025em;line-height:1.1;font-variation-settings:"SOFT" 40,"opsz" 144}
-  h1{font-size:clamp(44px,6.2vw,76px);letter-spacing:-.04em;line-height:1}
-  h2{font-size:clamp(30px,3.6vw,44px);letter-spacing:-.03em}
-  h3{font-size:20px;letter-spacing:-.015em}
+  h1,h2,h3,h4{font-family:'Fraunces',serif;color:var(--ink);font-weight:500;letter-spacing:-.02em;line-height:1.15;font-variation-settings:"SOFT" 40,"opsz" 144}
+  h1{font-size:clamp(48px,6.5vw,80px);letter-spacing:-.04em;line-height:1}
+  h2{font-size:clamp(32px,4vw,48px);letter-spacing:-.03em}
+  h3{font-size:21px;letter-spacing:-.01em}
   em.it{font-style:italic;color:var(--gold);font-variation-settings:"SOFT" 100,"opsz" 144}
   p{color:var(--ink-82)}
-  .muted{color:var(--muted)}
-  .eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);font-weight:500}
-  .eyebrow::before{content:"";width:28px;height:1px;background:var(--gold);opacity:.7}
+  .eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:11px;letter-spacing:.25em;text-transform:uppercase;color:var(--gold);font-weight:600}
+  .eyebrow::before{content:"";width:32px;height:1.5px;background:linear-gradient(90deg,var(--gold),var(--gold-light));border-radius:1px}
 
-  .btn{display:inline-flex;align-items:center;gap:10px;font-size:15px;font-weight:500;padding:14px 24px;border-radius:999px;cursor:pointer;border:none;transition:all .3s cubic-bezier(.4,0,.2,1);letter-spacing:-.01em}
-  .btn-primary{background:var(--ink);color:var(--cream);box-shadow:var(--sh-inset)}
-  .btn-primary:hover{transform:translateY(-1px);background:#2a2a2a}
-  .btn-wa{background:#25d366;color:#fff}
-  .btn-wa:hover{transform:translateY(-1px);background:#1fbf5c;box-shadow:0 8px 20px rgba(37,211,102,.3)}
-  .btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--ink-40)}
-  .btn-ghost:hover{background:var(--ink);color:var(--cream)}
-  .btn-arrow{transition:transform .3s}
-  .btn:hover .btn-arrow{transform:translateX(3px)}
+  .btn{display:inline-flex;align-items:center;gap:10px;font-size:15px;font-weight:500;padding:14px 28px;border-radius:999px;cursor:pointer;border:none;transition:all .35s cubic-bezier(.4,0,.2,1);letter-spacing:-.01em;position:relative;overflow:hidden}
+  .btn::after{content:"";position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.15),transparent);opacity:0;transition:opacity .35s}
+  .btn:hover::after{opacity:1}
+  .btn-wa{background:linear-gradient(135deg,#25d366,#20bd5a);color:#fff;box-shadow:0 4px 16px rgba(37,211,102,.25)}
+  .btn-wa:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(37,211,102,.35)}
+  .btn-ghost{background:transparent;color:var(--ink);border:1.5px solid var(--ink-40)}
+  .btn-ghost:hover{background:var(--ink);color:var(--cream);border-color:var(--ink)}
 
-  .brand{display:flex;align-items:center;gap:14px}
-  .brand-mark{width:22px;height:38px;display:flex;flex-direction:column;justify-content:space-between;align-items:center}
-  .brand-mark .cap,.brand-mark .base{width:22px;height:3px;border-radius:1px}
-  .brand-mark .cap-2,.brand-mark .base-2{width:18px;height:2px;border-radius:1px}
-  .brand-mark .shaft{width:2px;flex:1;margin:2px 0;position:relative}
-  .brand-mark .shaft::after{content:"";position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:5px;height:5px;border-radius:50%;background:var(--gold)}
-  .brand-text{display:flex;flex-direction:column;line-height:1}
-  .brand-text .name{font-family:'Montserrat',sans-serif;font-size:20px;font-weight:400;letter-spacing:.26em;text-transform:uppercase}
-  .brand-text .sub{font-size:10px;letter-spacing:.26em;text-transform:uppercase;margin-top:5px;font-weight:500}
+  /* Logo */
+  .logo{height:42px;width:auto;object-fit:contain}
+  .logo-footer{height:36px;filter:brightness(0) invert(1);opacity:.9}
 
-  /* Header azul oscuro */
-  header{position:sticky;top:0;z-index:50;background:var(--navy);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--navy-border)}
-  header .brand-mark .cap,header .brand-mark .base,header .brand-mark .cap-2,header .brand-mark .base-2,header .brand-mark .shaft{background:var(--cream)}
-  header .brand-text .name{color:var(--cream)}
-  header .brand-text .sub{color:var(--gold-soft)}
+  /* Header */
+  header{position:sticky;top:0;z-index:50;background:rgba(26,39,68,.97);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);border-bottom:1px solid rgba(255,255,255,.06)}
   .nav{display:flex;align-items:center;justify-content:space-between;height:72px}
-  nav ul{display:flex;gap:32px;list-style:none}
-  nav a{font-size:14px;position:relative;transition:color .2s;color:rgba(244,240,228,.8)}
+  nav ul{display:flex;gap:36px;list-style:none}
+  nav a{font-size:13.5px;font-weight:400;letter-spacing:.02em;position:relative;transition:color .25s;color:rgba(244,240,228,.65)}
   nav a:hover{color:var(--cream)}
-  nav a::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:1px;background:var(--cream);transform:scaleX(0);transform-origin:left;transition:transform .3s}
+  nav a::after{content:"";position:absolute;left:0;right:0;bottom:-6px;height:1.5px;background:var(--gold-soft);transform:scaleX(0);transform-origin:left;transition:transform .35s cubic-bezier(.4,0,.2,1)}
   nav a:hover::after{transform:scaleX(1)}
-  header .btn-primary{background:var(--gold);color:var(--cream)}
-  header .btn-primary:hover{background:var(--gold-soft)}
+  .nav-cta{background:linear-gradient(135deg,var(--gold),var(--gold-soft));color:var(--cream);font-size:13.5px;padding:10px 20px;border-radius:999px;font-weight:500;display:inline-flex;align-items:center;gap:8px;transition:all .3s;border:none;cursor:pointer}
+  .nav-cta:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(138,109,43,.3)}
+  .nav-cta svg{opacity:.85}
 
-  .hero{position:relative;padding:100px 0 110px;overflow:hidden;text-align:center}
+  /* Hero */
+  .hero{position:relative;padding:120px 0 130px;overflow:hidden;text-align:center}
   .hero-bg{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-  .hero-bg::before,.hero-bg::after{content:"";position:absolute;border-radius:50%;filter:blur(90px);opacity:.38}
-  .hero-bg::before{width:500px;height:500px;background:radial-gradient(circle,#d4b77a,transparent 70%);top:-140px;right:-80px;animation:float1 18s ease-in-out infinite}
-  .hero-bg::after{width:420px;height:420px;background:radial-gradient(circle,#c4b8a0,transparent 70%);bottom:-160px;left:-80px;animation:float2 22s ease-in-out infinite}
-  @keyframes float1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-30px,40px) scale(1.08)}}
-  @keyframes float2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(40px,-30px) scale(1.1)}}
+  .hero-bg::before{content:"";position:absolute;width:800px;height:800px;border-radius:50%;background:radial-gradient(circle,rgba(184,151,74,.18),transparent 65%);top:-300px;right:-200px;animation:heroGlow1 20s ease-in-out infinite}
+  .hero-bg::after{content:"";position:absolute;width:600px;height:600px;border-radius:50%;background:radial-gradient(circle,rgba(26,39,68,.1),transparent 65%);bottom:-200px;left:-150px;animation:heroGlow2 25s ease-in-out infinite}
+  @keyframes heroGlow1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-50px,60px) scale(1.15)}}
+  @keyframes heroGlow2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(60px,-40px) scale(1.1)}}
+  .hero-decoration{position:absolute;top:60%;left:5%;width:120px;height:120px;border:1px solid var(--cream-border);border-radius:50%;opacity:.4;animation:decoSpin 40s linear infinite}
+  .hero-decoration-2{position:absolute;top:20%;right:8%;width:80px;height:80px;border:1px solid var(--cream-border);border-radius:50%;opacity:.3;animation:decoSpin 30s linear infinite reverse}
+  @keyframes decoSpin{to{transform:rotate(360deg)}}
   .hero-inner{position:relative;max-width:820px;margin:0 auto}
-  .badge{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:999px;background:var(--cream);border:1px solid var(--cream-border);font-size:13px;color:var(--ink-82);margin-bottom:28px;box-shadow:var(--sh-card)}
-  .badge .dot{width:8px;height:8px;border-radius:50%;background:#25d366;box-shadow:0 0 0 4px rgba(37,211,102,.15);animation:pulse 2s ease-in-out infinite}
-  @keyframes pulse{0%,100%{box-shadow:0 0 0 4px rgba(37,211,102,.15)}50%{box-shadow:0 0 0 7px rgba(37,211,102,.08)}}
-  .hero h1{margin-bottom:26px}
-  .hero-sub{font-size:16px;line-height:1.55;color:var(--ink-82);max-width:580px;margin:0 auto 36px;font-style:italic}
-  .hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .badge{display:inline-flex;align-items:center;gap:10px;padding:10px 20px;border-radius:999px;background:rgba(255,255,255,.6);backdrop-filter:blur(10px);border:1px solid var(--cream-border);font-size:13px;color:var(--ink-82);margin-bottom:36px;box-shadow:var(--sh-card);font-weight:400}
+  .badge .dot{width:8px;height:8px;border-radius:50%;background:#25d366;box-shadow:0 0 0 4px rgba(37,211,102,.15);animation:pulse 2.5s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 4px rgba(37,211,102,.15)}50%{box-shadow:0 0 0 8px rgba(37,211,102,.06)}}
+  .hero h1{margin-bottom:20px;background:linear-gradient(135deg,var(--ink) 0%,var(--navy) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  .hero-sub{font-size:20px;line-height:1.5;color:var(--ink-60);max-width:520px;margin:0 auto 44px;font-weight:300;letter-spacing:-.01em}
+  .hero-cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap}
 
-  section{padding:90px 0;position:relative}
-  .section-head{text-align:center;max-width:650px;margin:0 auto 56px}
-  .section-head .eyebrow{margin-bottom:16px}
-  .section-head h2{margin-bottom:14px}
-  .section-head p{font-size:17px;line-height:1.55}
+  /* Sections */
+  section{padding:100px 0;position:relative}
+  .section-head{text-align:center;max-width:640px;margin:0 auto 60px}
+  .section-head .eyebrow{margin-bottom:18px}
+  .section-head h2{margin-bottom:16px}
+  .section-head p{font-size:17px;line-height:1.65;color:var(--ink-60)}
+  .section-divider{width:60px;height:2px;background:linear-gradient(90deg,var(--gold),var(--gold-light));margin:0 auto 60px;border-radius:1px;opacity:.6}
 
-  /* Cómo trabajamos — 5 pasos */
-  .how{background:var(--cream-2);border-top:1px solid var(--cream-border);border-bottom:1px solid var(--cream-border)}
-  .how-intro{text-align:center;max-width:700px;margin:0 auto 48px;font-size:16px;line-height:1.6;color:var(--ink-82)}
-  .how-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:20px;max-width:1060px;margin:0 auto;position:relative}
-  .how-grid::before{content:"";position:absolute;top:34px;left:10%;right:10%;height:1px;background:linear-gradient(90deg,transparent,var(--ink-08),transparent)}
-  .how-step{text-align:center;position:relative}
-  .how-step .circle{width:68px;height:68px;border-radius:50%;background:var(--cream);border:1px solid var(--cream-border);display:flex;align-items:center;justify-content:center;color:var(--gold);margin:0 auto 18px;box-shadow:var(--sh-card);position:relative;z-index:1;font-family:'Fraunces',serif;font-size:22px;font-weight:600}
-  .how-step h3{margin-bottom:6px;font-size:16px}
-  .how-step p{font-size:13px;line-height:1.5;max-width:190px;margin:0 auto}
-  .how-honorarios{text-align:center;max-width:700px;margin:48px auto 0;font-size:14px;line-height:1.6;color:var(--muted);font-style:italic;padding-top:28px;border-top:1px solid var(--cream-border)}
-
-  /* Servicios — 5 áreas */
+  /* Servicios */
   .services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
-  .service{background:var(--cream);border:1px solid var(--cream-border);border-radius:18px;padding:30px 26px;transition:all .4s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden}
-  .service::before{content:"";position:absolute;inset:0;background:linear-gradient(135deg,var(--gold-tint),transparent 60%);opacity:0;transition:opacity .4s}
-  .service:hover{transform:translateY(-4px);box-shadow:var(--sh-hover);border-color:var(--ink-08)}
+  .service{background:rgba(255,255,255,.5);backdrop-filter:blur(6px);border:1px solid var(--cream-border);border-radius:var(--radius);padding:32px 28px;transition:all .4s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden}
+  .service::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--gold-light));opacity:0;transition:opacity .4s}
+  .service:hover{transform:translateY(-6px);box-shadow:var(--sh-card-hover);border-color:var(--gold-light)}
   .service:hover::before{opacity:1}
-  .service-icon{font-size:28px;margin-bottom:14px;position:relative;z-index:1}
-  .service h3{margin-bottom:8px;position:relative;z-index:1;font-size:18px}
-  .service ul{list-style:none;position:relative;z-index:1;margin-top:6px}
-  .service ul li{font-size:14px;line-height:1.55;color:var(--ink-82);padding:3px 0;padding-left:16px;position:relative}
-  .service ul li::before{content:"·";position:absolute;left:0;color:var(--gold);font-weight:700}
+  .service-icon{font-size:32px;margin-bottom:16px;display:inline-block}
+  .service h3{margin-bottom:10px;font-size:18px}
+  .service ul{list-style:none;margin-top:8px}
+  .service ul li{font-size:14px;line-height:1.6;color:var(--ink-82);padding:4px 0 4px 18px;position:relative}
+  .service ul li::before{content:"";position:absolute;left:0;top:12px;width:6px;height:6px;border-radius:50%;background:var(--gold-light);opacity:.6}
+
+  /* Cómo trabajamos */
+  .how{background:linear-gradient(180deg,var(--cream-2) 0%,var(--cream-3) 100%);border-top:1px solid var(--cream-border);border-bottom:1px solid var(--cream-border);position:relative;overflow:hidden}
+  .how::before{content:"";position:absolute;top:-200px;right:-200px;width:500px;height:500px;border-radius:50%;background:radial-gradient(circle,rgba(184,151,74,.08),transparent 60%);pointer-events:none}
+  .how-intro{text-align:center;max-width:680px;margin:0 auto 56px;font-size:16px;line-height:1.7;color:var(--ink-60)}
+  .how-timeline{display:flex;justify-content:center;gap:0;max-width:1060px;margin:0 auto;position:relative}
+  .how-timeline::before{content:"";position:absolute;top:32px;left:10%;right:10%;height:2px;background:linear-gradient(90deg,transparent,var(--cream-border),var(--gold-light),var(--cream-border),transparent)}
+  .how-step{flex:1;text-align:center;position:relative;padding:0 8px}
+  .how-step .num{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--navy-light));color:var(--gold-light);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-family:'Fraunces',serif;font-size:22px;font-weight:600;position:relative;z-index:1;box-shadow:0 4px 16px rgba(26,39,68,.2);transition:transform .3s,box-shadow .3s}
+  .how-step:hover .num{transform:scale(1.08);box-shadow:0 6px 24px rgba(26,39,68,.3)}
+  .how-step h3{margin-bottom:8px;font-size:15px;font-weight:600;color:var(--ink)}
+  .how-step p{font-size:13px;line-height:1.55;max-width:180px;margin:0 auto;color:var(--ink-60)}
+  .how-honorarios{text-align:center;max-width:680px;margin:56px auto 0;font-size:14px;line-height:1.65;color:var(--muted);padding-top:32px;border-top:1px solid var(--cream-border)}
 
   /* Quiénes somos */
-  .about{background:var(--cream-2);border-top:1px solid var(--cream-border);border-bottom:1px solid var(--cream-border)}
-  .about-content{max-width:760px;margin:0 auto}
-  .about-content p{font-size:16px;line-height:1.7;color:var(--ink-82);margin-bottom:18px}
+  .about{position:relative;overflow:hidden}
+  .about::before{content:"";position:absolute;bottom:-100px;left:-100px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(26,39,68,.04),transparent 60%);pointer-events:none}
+  .about-content{max-width:740px;margin:0 auto;position:relative}
+  .about-content p{font-size:16.5px;line-height:1.75;color:var(--ink-82);margin-bottom:20px}
   .about-content p:last-child{margin-bottom:0}
+  .about-content p:first-child::first-letter{font-family:'Fraunces',serif;font-size:48px;float:left;line-height:.85;margin-right:10px;margin-top:6px;color:var(--navy);font-weight:600}
 
   /* Equipo */
+  .team{background:linear-gradient(180deg,var(--cream) 0%,var(--cream-2) 100%)}
   .team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1000px;margin:0 auto}
-  .team-card{background:var(--cream);border:1px solid var(--cream-border);border-radius:18px;padding:32px 26px;text-align:center}
-  .team-card .team-role{font-size:12px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);font-weight:500;margin-bottom:14px}
-  .team-card h3{margin-bottom:8px;font-size:19px}
-  .team-card .team-credentials{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:12px}
-  .team-card p{font-size:14px;line-height:1.55;color:var(--ink-82)}
-  .team-note{text-align:center;max-width:700px;margin:40px auto 0;font-size:14px;line-height:1.6;color:var(--muted);font-style:italic}
+  .team-card{background:rgba(255,255,255,.6);backdrop-filter:blur(6px);border:1px solid var(--cream-border);border-radius:var(--radius);padding:36px 28px;text-align:center;transition:all .4s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden}
+  .team-card::after{content:"";position:absolute;bottom:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--gold),var(--gold-light));opacity:0;transition:opacity .4s}
+  .team-card:hover{transform:translateY(-4px);box-shadow:var(--sh-card-hover)}
+  .team-card:hover::after{opacity:1}
+  .team-card .team-icon{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--navy),var(--navy-light));display:flex;align-items:center;justify-content:center;margin:0 auto 18px;color:var(--gold-light);font-size:22px}
+  .team-card .team-role{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:600;margin-bottom:14px}
+  .team-card h3{margin-bottom:10px;font-size:19px}
+  .team-card .team-credentials{font-size:12.5px;color:var(--muted);line-height:1.55;margin-bottom:14px}
+  .team-card p{font-size:14px;line-height:1.6;color:var(--ink-60)}
+  .team-note{text-align:center;max-width:680px;margin:44px auto 0;font-size:13.5px;line-height:1.65;color:var(--muted)}
 
-  /* CTA final */
-  .cta{padding:90px 0;text-align:center}
-  .cta-card{background:var(--navy);color:var(--cream);border-radius:28px;padding:70px 40px;max-width:880px;margin:0 auto;position:relative;overflow:hidden}
-  .cta-card::before{content:"";position:absolute;top:-80px;right:-80px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(184,151,74,.22),transparent 70%)}
-  .cta-card .eyebrow{color:var(--gold-soft);margin-bottom:20px}
-  .cta-card .eyebrow::before{background:var(--gold-soft)}
-  .cta-card h2{color:var(--cream);margin-bottom:18px;position:relative}
-  .cta-card p{color:rgba(244,240,228,.75);font-size:17px;line-height:1.55;max-width:480px;margin:0 auto 32px;position:relative}
-  .cta-card .btn-wa{position:relative;font-size:16px;padding:16px 28px}
+  /* CTA */
+  .cta{padding:100px 0;text-align:center}
+  .cta-card{background:linear-gradient(135deg,var(--navy) 0%,var(--navy-2) 50%,var(--navy-light) 100%);color:var(--cream);border-radius:28px;padding:80px 48px;max-width:900px;margin:0 auto;position:relative;overflow:hidden}
+  .cta-card::before{content:"";position:absolute;top:-100px;right:-100px;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(184,151,74,.18),transparent 65%);animation:ctaGlow 15s ease-in-out infinite}
+  .cta-card::after{content:"";position:absolute;bottom:-80px;left:-80px;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(184,151,74,.1),transparent 65%);animation:ctaGlow 18s ease-in-out infinite reverse}
+  @keyframes ctaGlow{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+  .cta-card .eyebrow{color:var(--gold-light);margin-bottom:24px;position:relative}
+  .cta-card .eyebrow::before{background:var(--gold-light)}
+  .cta-card h2{color:var(--cream);margin-bottom:20px;position:relative}
+  .cta-card p{color:rgba(244,240,228,.65);font-size:17px;line-height:1.6;max-width:460px;margin:0 auto 36px;position:relative}
+  .cta-card .btn-wa{position:relative;font-size:16px;padding:16px 32px}
 
-  /* Footer azul oscuro */
-  footer{background:var(--navy);color:rgba(244,240,228,.5);padding:40px 0;border-top:1px solid var(--navy-border)}
-  .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;font-size:13px}
-  .foot .brand-text .name{color:var(--cream)}
-  .foot .brand-mark .cap,.foot .brand-mark .base,.foot .brand-mark .cap-2,.foot .brand-mark .base-2,.foot .brand-mark .shaft{background:var(--cream)}
-  .foot-info{text-align:right;line-height:1.6}
+  /* Footer */
+  footer{background:var(--navy);color:rgba(244,240,228,.45);padding:44px 0;border-top:1px solid rgba(255,255,255,.05)}
+  .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;font-size:13px}
+  .foot-info{text-align:right;line-height:1.7}
+  .foot-info a{color:rgba(244,240,228,.7);transition:color .2s}
+  .foot-info a:hover{color:var(--gold-light)}
 
-  .reveal{opacity:0;transform:translateY(20px);transition:opacity .8s cubic-bezier(.4,0,.2,1),transform .8s cubic-bezier(.4,0,.2,1)}
+  /* Animations */
+  .reveal{opacity:0;transform:translateY(28px);transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1)}
   .reveal.in{opacity:1;transform:translateY(0)}
-  .reveal.d1{transition-delay:.08s}.reveal.d2{transition-delay:.16s}.reveal.d3{transition-delay:.24s}.reveal.d4{transition-delay:.32s}
+  .reveal.d1{transition-delay:.1s}.reveal.d2{transition-delay:.2s}.reveal.d3{transition-delay:.3s}.reveal.d4{transition-delay:.4s}
+
+  /* WhatsApp float */
+  .wa-float{position:fixed;bottom:28px;right:28px;z-index:60;width:60px;height:60px;border-radius:50%;background:linear-gradient(135deg,#25d366,#20bd5a);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 20px rgba(37,211,102,.35),0 2px 8px rgba(0,0,0,.1);transition:transform .3s,box-shadow .3s}
+  .wa-float:hover{transform:scale(1.1);box-shadow:0 10px 30px rgba(37,211,102,.4),0 4px 12px rgba(0,0,0,.12)}
+
+  /* Mobile menu */
+  .menu-toggle{display:none;background:none;border:none;cursor:pointer;padding:8px;color:var(--cream)}
+  .menu-toggle svg{display:block}
 
   @media (max-width:960px){
-    .how-grid{grid-template-columns:repeat(3,1fr);gap:20px}
-    .team-grid{grid-template-columns:1fr}
+    .how-timeline{flex-wrap:wrap;gap:24px;justify-content:center}
+    .how-timeline::before{display:none}
+    .how-step{flex:0 0 calc(33.33% - 16px);min-width:180px}
+    .team-grid{grid-template-columns:1fr;max-width:480px}
   }
   @media (max-width:860px){
-    .services-grid,.how-grid{grid-template-columns:1fr;gap:24px}
-    .how-grid::before{display:none}
-    section{padding:64px 0}
-    .hero{padding:70px 0 80px}
-    .cta{padding:64px 0}
+    .services-grid{grid-template-columns:1fr;max-width:480px;margin:0 auto}
+    .how-step{flex:0 0 100%}
+    section{padding:72px 0}
+    .hero{padding:80px 0 90px}
+    .cta{padding:72px 0}
     nav ul{display:none}
-    .cta-card{padding:48px 24px}
-    .foot{flex-direction:column;text-align:center}
+    .menu-toggle{display:block}
+    .cta-card{padding:52px 28px;border-radius:22px}
+    .foot{flex-direction:column;text-align:center;gap:16px}
     .foot-info{text-align:center}
   }
   @media (max-width:520px){
-    h1{font-size:40px}
-    .hero-sub{font-size:15px}
+    h1{font-size:42px}
+    h2{font-size:30px}
+    .hero-sub{font-size:17px}
+    .container{padding:0 20px}
+    .hero{padding:64px 0 72px}
   }
 </style>
 </head>
@@ -193,9 +211,8 @@
 
 <header>
   <div class="container nav">
-    <a href="#" class="brand">
-      <div class="brand-mark"><div class="cap"></div><div class="cap-2"></div><div class="shaft"></div><div class="base-2"></div><div class="base"></div></div>
-      <div class="brand-text"><span class="name">COLUMEN</span><span class="sub">Legal &amp; Notarial</span></div>
+    <a href="#">
+      <img src="logo-columen.jpg" alt="Columen Legal &amp; Notarial" class="logo" style="filter:brightness(0) invert(1);opacity:.95">
     </a>
     <nav>
       <ul>
@@ -206,8 +223,8 @@
         <li><a href="#contacto">Contacto</a></li>
       </ul>
     </nav>
-    <a href="https://wa.me/5492617571910?text=Hola%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" class="btn btn-primary">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.966-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    <a href="https://wa.me/5492617571910?text=Hola%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" class="nav-cta">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.966-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
       Consulta
     </a>
   </div>
@@ -215,6 +232,8 @@
 
 <section class="hero">
   <div class="hero-bg"></div>
+  <div class="hero-decoration"></div>
+  <div class="hero-decoration-2"></div>
   <div class="container hero-inner">
     <div class="badge reveal"><span class="dot"></span> Respondemos en 24 hs · Te damos un plan claro desde el inicio</div>
     <h1 class="reveal d1">Columen</h1>
@@ -294,31 +313,31 @@
       <h2>Un proceso <em class="it">claro</em> de punta a punta.</h2>
     </div>
     <p class="how-intro reveal">Ofrecemos un servicio integral que combina asesoramiento jurídico con intervención notarial, a través de un modelo 100% online que permite optimizar tiempos y facilitar el acceso a soluciones legales.</p>
-    <div class="how-grid">
+    <div class="how-timeline">
       <div class="how-step reveal">
-        <div class="circle">1</div>
-        <h3>Primer contacto</h3>
-        <p>Escribinos por WhatsApp o completá el formulario de contacto.</p>
+        <div class="num">1</div>
+        <h3>Contacto</h3>
+        <p>Nos escribís por WhatsApp o completás el formulario.</p>
       </div>
       <div class="how-step reveal d1">
-        <div class="circle">2</div>
+        <div class="num">2</div>
         <h3>Evaluación inicial</h3>
-        <p>Revisamos tu consulta para identificar el asesoramiento que necesitás.</p>
+        <p>Revisamos tu consulta para orientarte sobre los próximos pasos.</p>
       </div>
       <div class="how-step reveal d2">
-        <div class="circle">3</div>
+        <div class="num">3</div>
         <h3>Consulta profesional</h3>
-        <p>Si se requiere un análisis en profundidad, coordinamos una consulta online arancelada.</p>
+        <p>Coordinamos una reunión online arancelada para analizar tu caso en profundidad.</p>
       </div>
       <div class="how-step reveal d3">
-        <div class="circle">4</div>
-        <h3>Diagnóstico y propuesta</h3>
-        <p>Recibís un análisis claro junto con alternativas y honorarios definidos.</p>
+        <div class="num">4</div>
+        <h3>Diagnóstico</h3>
+        <p>Recibís un análisis claro, alternativas y propuesta de trabajo.</p>
       </div>
       <div class="how-step reveal d4">
-        <div class="circle">5</div>
+        <div class="num">5</div>
         <h3>Desarrollo</h3>
-        <p>Trabajamos en tu caso con seguimiento permanente y comunicación directa.</p>
+        <p>Si decidís avanzar, gestionamos tu caso con seguimiento directo.</p>
       </div>
     </div>
     <p class="how-honorarios reveal">Nuestros honorarios se establecen conforme a criterios profesionales y en línea con los valores mínimos fijados por el Colegio de Abogados y el Colegio Notarial de Mendoza.</p>
@@ -341,7 +360,7 @@
   </div>
 </section>
 
-<section id="equipo">
+<section class="team" id="equipo">
   <div class="container">
     <div class="section-head reveal">
       <div class="eyebrow">Equipo</div>
@@ -349,18 +368,21 @@
     </div>
     <div class="team-grid">
       <div class="team-card reveal">
+        <div class="team-icon">⚖️</div>
         <div class="team-role">Dirección Legal</div>
         <h3>Dr. Pablo Javier Olaiz</h3>
         <div class="team-credentials">Abogado · Mat. Prof. Nº 4594 · Mat. Federal T. 76 F. 894<br>Magíster en Derecho Empresario · MBA</div>
         <p>A cargo de la dirección del área legal, con treinta años de experiencia en el ejercicio profesional. Responsable del análisis estratégico y del seguimiento integral de las soluciones propuestas.</p>
       </div>
       <div class="team-card reveal d1">
+        <div class="team-icon">📜</div>
         <div class="team-role">Dirección Notarial</div>
         <h3>Registro Notarial Nº 646</h3>
         <div class="team-credentials">Titular de Registro Notarial Nº 646 de Capital</div>
         <p>Responsable del área notarial, con 24 años de experiencia en el ejercicio de la función notarial.</p>
       </div>
       <div class="team-card reveal d2">
+        <div class="team-icon">🤝</div>
         <div class="team-role">Red de profesionales</div>
         <h3>Profesionales asociados</h3>
         <div class="team-credentials">Especialistas en distintas áreas del derecho</div>
@@ -375,7 +397,7 @@
   <div class="container">
     <div class="cta-card reveal">
       <div class="eyebrow">Contacto</div>
-      <h2>Resolvé tu consulta <em class="it" style="color:var(--gold-soft)">hoy.</em></h2>
+      <h2>Resolvé tu consulta <em class="it" style="color:var(--gold-light)">hoy.</em></h2>
       <p>Escribinos por WhatsApp y te respondemos en 24 hs. Te damos un plan claro desde el inicio.</p>
       <a href="https://wa.me/5492617571910?text=Hola%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" class="btn btn-wa">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.966-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
@@ -387,9 +409,8 @@
 
 <footer>
   <div class="container foot">
-    <a href="#" class="brand">
-      <div class="brand-mark"><div class="cap"></div><div class="cap-2"></div><div class="shaft"></div><div class="base-2"></div><div class="base"></div></div>
-      <div class="brand-text"><span class="name">COLUMEN</span><span class="sub" style="color:var(--gold-soft)">Legal &amp; Notarial</span></div>
+    <a href="#">
+      <img src="logo-columen.jpg" alt="Columen Legal &amp; Notarial" class="logo logo-footer">
     </a>
     <div class="foot-info">
       <div>Catamarca 170, Planta Baja, oficinas 8 y 10 · Ciudad de Mendoza</div>
@@ -398,14 +419,12 @@
   </div>
 </footer>
 
-<a href="https://wa.me/5492617571910?text=Hola%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" aria-label="WhatsApp"
-  style="position:fixed;bottom:24px;right:24px;z-index:60;width:58px;height:58px;border-radius:50%;background:#25d366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px rgba(37,211,102,.35),0 4px 10px rgba(0,0,0,.15);transition:transform .3s"
-  onmouseover="this.style.transform='scale(1.08)'" onmouseout="this.style.transform='scale(1)'">
+<a href="https://wa.me/5492617571910?text=Hola%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" aria-label="WhatsApp" class="wa-float">
   <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.966-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
 </a>
 
 <script>
-  const io=new IntersectionObserver(es=>es.forEach(e=>e.isIntersecting&&(e.target.classList.add('in'),io.unobserve(e.target))),{threshold:.12,rootMargin:'0px 0px -40px 0px'});
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1,rootMargin:'0px 0px -60px 0px'});
   document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 </script>
 
