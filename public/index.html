@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#1a2744">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT@0,9..144,300..700,0..100;1,9..144,300..700,0..100&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
     --navy:#1a2744;
@@ -16,138 +16,161 @@
     --cream:#f4f0e4;
     --cream-2:#ece6d5;
     --cream-border:#d8d0bc;
+    --white:#fff;
     --ink:#1c1c1c;
     --ink-80:rgba(28,28,28,.8);
     --ink-55:rgba(28,28,28,.55);
-    --ink-30:rgba(28,28,28,.3);
+    --ink-25:rgba(28,28,28,.25);
     --gold:#8a6d2b;
     --gold-soft:#b8974a;
-    --r:16px;
+    --r:14px;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{scroll-behavior:smooth;-webkit-font-smoothing:antialiased}
-  body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);line-height:1.6;background:var(--cream);overflow-x:hidden}
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);line-height:1.65;background:var(--white);overflow-x:hidden}
   ::selection{background:var(--navy);color:var(--cream)}
   a{color:inherit;text-decoration:none}
-  .container{max-width:1080px;margin:0 auto;padding:0 32px}
-  h1,h2,h3{font-family:'Fraunces',serif;font-weight:500;letter-spacing:-.02em;line-height:1.15;font-variation-settings:"SOFT" 40,"opsz" 144}
-  h1{font-size:clamp(40px,5.5vw,68px);letter-spacing:-.035em;line-height:1.05}
-  h2{font-size:clamp(28px,3.5vw,42px);letter-spacing:-.025em}
-  h3{font-size:20px}
-  em.it{font-style:italic;color:var(--gold);font-variation-settings:"SOFT" 100,"opsz" 144}
-  .label{font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:500;margin-bottom:16px}
+  .container{max-width:1100px;margin:0 auto;padding:0 36px}
+  h1,h2,h3{font-family:'Lora',Georgia,serif;font-weight:600;letter-spacing:-.01em;line-height:1.2}
+  h1{font-size:clamp(36px,4.8vw,58px);line-height:1.15}
+  h2{font-size:clamp(26px,3.2vw,38px)}
+  h3{font-size:19px;font-weight:600}
+  em.it{font-style:italic;color:var(--gold)}
+  .label{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:500;margin-bottom:14px}
 
-  .btn{display:inline-flex;align-items:center;gap:9px;font-size:14.5px;font-weight:500;padding:13px 26px;border-radius:999px;border:none;cursor:pointer;transition:background .2s,box-shadow .2s,color .2s}
+  .btn{display:inline-flex;align-items:center;gap:9px;font-size:15px;font-weight:500;padding:14px 28px;border-radius:8px;border:none;cursor:pointer;transition:background .2s,box-shadow .2s,color .2s}
   .btn-wa{background:#25d366;color:#fff}
-  .btn-wa:hover{background:#1ead56;box-shadow:0 4px 14px rgba(37,211,102,.25)}
-  .btn-line{background:transparent;border:1.5px solid var(--ink-30);color:var(--ink)}
-  .btn-line:hover{border-color:var(--ink);background:var(--ink);color:var(--cream)}
-  .btn-line-light{background:transparent;border:1.5px solid rgba(244,240,228,.25);color:var(--cream)}
-  .btn-line-light:hover{background:var(--cream);color:var(--navy);border-color:var(--cream)}
+  .btn-wa:hover{background:#1da851;box-shadow:0 4px 14px rgba(37,211,102,.2)}
+  .btn-line{background:transparent;border:1.5px solid var(--ink-25);color:var(--ink)}
+  .btn-line:hover{border-color:var(--ink);background:var(--ink);color:var(--white)}
+  .btn-light{background:rgba(255,255,255,.12);border:1.5px solid rgba(255,255,255,.2);color:var(--cream)}
+  .btn-light:hover{background:var(--cream);color:var(--navy);border-color:var(--cream)}
 
   header{position:sticky;top:0;z-index:50;background:var(--navy);border-bottom:1px solid rgba(255,255,255,.06)}
-  .nav{display:flex;align-items:center;justify-content:space-between;height:68px}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:80px}
   .logo-wrap{display:flex;align-items:center;color:var(--cream)}
-  .logo-wrap svg{height:38px;width:auto}
-  nav ul{display:flex;gap:32px;list-style:none}
-  nav a{font-size:13.5px;color:rgba(244,240,228,.55);transition:color .2s}
+  .logo-wrap svg{height:52px;width:auto}
+  nav ul{display:flex;gap:28px;list-style:none}
+  nav a{font-size:14px;color:rgba(244,240,228,.55);transition:color .2s}
   nav a:hover{color:var(--cream)}
-  .nav-cta{background:var(--gold);color:var(--cream);font-size:13px;padding:9px 18px;border-radius:999px;font-weight:500;display:inline-flex;align-items:center;gap:7px;transition:background .2s;border:none;cursor:pointer}
+  .nav-cta{background:var(--gold);color:var(--cream);font-size:14px;padding:10px 22px;border-radius:8px;font-weight:500;display:inline-flex;align-items:center;gap:8px;transition:background .2s;border:none;cursor:pointer}
   .nav-cta:hover{background:var(--gold-soft)}
 
-  .hero{background:linear-gradient(to bottom,var(--navy) 60%,var(--cream));padding:100px 0 140px;position:relative;overflow:hidden}
-  .hero-inner{position:relative;z-index:1;max-width:680px}
-  .hero .label{color:var(--gold-soft);margin-bottom:24px}
-  .hero h1{color:var(--cream);margin-bottom:24px}
+  .hero{background:var(--navy);padding:80px 0 0;position:relative}
+  .hero-top{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;padding-bottom:80px}
+  .hero-text{position:relative;z-index:1}
+  .hero .label{color:var(--gold-soft);margin-bottom:20px;font-size:14px}
+  .hero h1{color:var(--cream);margin-bottom:20px}
   .hero h1 em.it{color:var(--gold-soft)}
-  .hero-sub{font-size:17px;line-height:1.6;color:rgba(244,240,228,.5);max-width:480px;margin-bottom:40px;font-weight:300}
+  .hero-sub{font-size:17px;line-height:1.7;color:rgba(244,240,228,.55);margin-bottom:36px}
   .hero-cta{display:flex;gap:12px;flex-wrap:wrap}
+  .hero-brand{display:flex;align-items:center;justify-content:center}
+  .hero-brand svg{width:100%;max-width:360px;height:auto;color:var(--cream);opacity:.12}
+  .hero-bar{background:var(--cream);padding:48px 0;border-bottom:1px solid var(--cream-border)}
+  .hero-bar-inner{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;text-align:center}
+  .hero-bar-item{padding:0 16px}
+  .hero-bar-num{font-family:'Lora',serif;font-size:32px;font-weight:700;color:var(--navy);margin-bottom:4px}
+  .hero-bar-label{font-size:14px;color:var(--ink-55)}
 
-  section{padding:88px 0}
-  .sec-head{max-width:560px;margin-bottom:48px}
-  .sec-head h2{margin-bottom:12px}
-  .sec-head p{font-size:16px;line-height:1.65;color:var(--ink-55)}
-  .sec-head-center{text-align:center;margin-left:auto;margin-right:auto}
+  section{padding:100px 0}
+  .sec-head{max-width:580px;margin-bottom:56px}
+  .sec-head h2{margin-bottom:14px}
+  .sec-head p{font-size:16.5px;line-height:1.7;color:var(--ink-55)}
+  .sec-center{text-align:center;margin-left:auto;margin-right:auto}
 
-  .svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  .svc-wide{grid-column:span 2;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .service{background:rgba(255,255,255,.7);border:1px solid var(--cream-border);border-radius:var(--r);padding:28px 24px;transition:box-shadow .2s,border-color .2s}
-  .service:hover{box-shadow:0 4px 16px rgba(0,0,0,.07);border-color:var(--gold-soft)}
-  .service-ico{width:40px;height:40px;margin-bottom:16px;color:var(--navy)}
+  .bg-cream{background:var(--cream)}
+  .bg-white{background:var(--white)}
+  .bg-navy{background:var(--navy);color:var(--cream)}
+
+  .svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+  .svc-row3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .service{background:var(--white);border:1px solid #e8e4da;border-radius:var(--r);padding:32px 28px;transition:box-shadow .2s}
+  .service:hover{box-shadow:0 6px 20px rgba(0,0,0,.06)}
+  .bg-cream .service{background:var(--white)}
+  .service-ico{width:44px;height:44px;margin-bottom:18px;color:var(--navy)}
   .service-ico svg{width:100%;height:100%}
-  .service h3{font-size:17px;margin-bottom:8px}
-  .service ul{list-style:none;margin-top:6px}
-  .service ul li{font-size:14px;line-height:1.6;color:var(--ink-80);padding:3px 0 3px 16px;position:relative}
-  .service ul li::before{content:"";position:absolute;left:0;top:11px;width:4px;height:4px;border-radius:50%;background:var(--gold-soft)}
+  .service h3{margin-bottom:10px}
+  .service ul{list-style:none;margin-top:8px}
+  .service ul li{font-size:14.5px;line-height:1.65;color:var(--ink-80);padding:4px 0 4px 18px;position:relative}
+  .service ul li::before{content:"";position:absolute;left:0;top:12px;width:5px;height:5px;border-radius:50%;border:1.5px solid var(--gold-soft)}
 
-  .how{background:var(--navy);color:var(--cream)}
+  .how{background:var(--navy);color:var(--cream);padding:100px 0}
   .how .sec-head h2{color:var(--cream)}
   .how .sec-head h2 em.it{color:var(--gold-soft)}
-  .how .sec-head p{color:rgba(244,240,228,.45)}
   .how .label{color:var(--gold-soft)}
-  .how-intro{max-width:600px;font-size:15px;line-height:1.7;color:rgba(244,240,228,.4);margin-bottom:48px}
-  .how-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
-  .step{text-align:center}
-  .step-num{width:48px;height:48px;border-radius:50%;border:1.5px solid rgba(244,240,228,.15);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-family:'Fraunces',serif;font-size:18px;color:var(--gold-soft);font-weight:500}
-  .step h3{font-size:14px;font-weight:600;color:var(--cream);margin-bottom:6px}
-  .step p{font-size:12.5px;line-height:1.5;color:rgba(244,240,228,.4);max-width:160px;margin:0 auto}
-  .how-note{margin-top:48px;padding-top:24px;border-top:1px solid rgba(255,255,255,.06);font-size:13px;color:rgba(244,240,228,.3);max-width:600px}
+  .how-intro{max-width:620px;font-size:16px;line-height:1.75;color:rgba(244,240,228,.45);margin-bottom:56px}
+  .how-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+  .step{text-align:center;padding:28px 12px;border:1px solid rgba(255,255,255,.08);border-radius:var(--r);transition:border-color .2s}
+  .step:hover{border-color:rgba(255,255,255,.18)}
+  .step-num{font-family:'Lora',serif;font-size:28px;font-weight:700;color:var(--gold-soft);margin-bottom:12px}
+  .step h3{font-size:14px;font-weight:600;color:var(--cream);margin-bottom:8px}
+  .step p{font-size:13px;line-height:1.55;color:rgba(244,240,228,.4);max-width:160px;margin:0 auto}
+  .how-note{margin-top:56px;padding-top:28px;border-top:1px solid rgba(255,255,255,.06);font-size:14px;color:rgba(244,240,228,.3);max-width:620px}
 
-  .about-layout{display:grid;grid-template-columns:3px 1fr;gap:32px;max-width:700px}
-  .about-bar{background:linear-gradient(180deg,var(--gold),var(--gold-soft),transparent);border-radius:2px}
-  .about-text p{font-size:16px;line-height:1.8;color:var(--ink-80);margin-bottom:16px}
+  .about-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start;max-width:940px}
+  .about-text p{font-size:16px;line-height:1.85;color:var(--ink-80);margin-bottom:18px}
   .about-text p:last-child{margin-bottom:0}
-  .about-text p:first-child{font-size:17px;color:var(--ink);font-weight:500}
+  .about-text p:first-child{font-size:18px;color:var(--ink);font-weight:500;line-height:1.6}
+  .about-sidebar{border-left:3px solid var(--gold);padding-left:28px}
+  .about-sidebar .about-stat{margin-bottom:28px}
+  .about-sidebar .about-stat:last-child{margin-bottom:0}
+  .about-stat-num{font-family:'Lora',serif;font-size:36px;font-weight:700;color:var(--navy);line-height:1}
+  .about-stat-label{font-size:14px;color:var(--ink-55);margin-top:4px}
 
-  .team{background:var(--cream-2)}
-  .team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-  .team-card{background:rgba(255,255,255,.7);border:1px solid var(--cream-border);border-radius:var(--r);padding:32px 24px;transition:box-shadow .2s}
-  .team-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.07)}
-  .team-role{font-size:11px;letter-spacing:.15em;text-transform:uppercase;color:var(--gold);font-weight:500;margin-bottom:12px}
-  .team-card h3{font-size:18px;margin-bottom:8px}
-  .team-cred{font-size:12.5px;color:var(--ink-55);line-height:1.5;margin-bottom:12px}
-  .team-card>p{font-size:14px;line-height:1.6;color:var(--ink-55)}
-  .team-note{margin-top:36px;font-size:13px;color:var(--ink-55);max-width:600px}
+  .team{background:var(--cream);padding:100px 0}
+  .team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .team-card{background:var(--white);border:1px solid #e8e4da;border-radius:var(--r);padding:36px 28px;transition:box-shadow .2s}
+  .team-card:hover{box-shadow:0 6px 20px rgba(0,0,0,.06)}
+  .team-role{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:500;margin-bottom:14px}
+  .team-card h3{font-size:19px;margin-bottom:10px}
+  .team-cred{font-size:13px;color:var(--ink-55);line-height:1.55;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e8e4da}
+  .team-card>p{font-size:14.5px;line-height:1.65;color:var(--ink-55)}
+  .team-note{margin-top:40px;font-size:14px;color:var(--ink-55);max-width:620px}
 
-  .cta{padding:88px 0;text-align:center}
-  .cta-box{background:var(--navy);color:var(--cream);border-radius:24px;padding:72px 40px;max-width:860px;margin:0 auto}
+  .cta{padding:100px 0;text-align:center}
+  .cta-box{background:var(--navy);color:var(--cream);border-radius:20px;padding:80px 48px;max-width:880px;margin:0 auto}
   .cta-box .label{color:var(--gold-soft);margin-bottom:20px}
-  .cta-box h2{color:var(--cream);margin-bottom:16px}
+  .cta-box h2{color:var(--cream);margin-bottom:18px}
   .cta-box h2 em.it{color:var(--gold-soft)}
-  .cta-box p{color:rgba(244,240,228,.5);font-size:16px;max-width:420px;margin:0 auto 28px}
-  .cta-box .btn-wa{font-size:15px;padding:14px 28px}
+  .cta-box p{color:rgba(244,240,228,.5);font-size:17px;max-width:440px;margin:0 auto 32px;line-height:1.6}
+  .cta-box .btn-wa{font-size:16px;padding:16px 32px}
 
-  footer{background:var(--navy);color:rgba(244,240,228,.35);padding:36px 0;border-top:1px solid rgba(255,255,255,.04)}
-  .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;font-size:13px}
-  .foot .logo-wrap svg{height:30px}
-  .foot-info{text-align:right;line-height:1.6}
+  footer{background:var(--navy);color:rgba(244,240,228,.35);padding:40px 0;border-top:1px solid rgba(255,255,255,.04)}
+  .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;font-size:13.5px}
+  .foot .logo-wrap svg{height:40px}
+  .foot-info{text-align:right;line-height:1.7}
 
   .wa-float{position:fixed;bottom:24px;right:24px;z-index:60;width:56px;height:56px;border-radius:50%;background:#25d366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(37,211,102,.3);transition:background .2s}
-  .wa-float:hover{background:#1ead56}
+  .wa-float:hover{background:#1da851}
 
   .reveal{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
   .reveal.in{opacity:1;transform:translateY(0)}
   .reveal.d1{transition-delay:.08s}.reveal.d2{transition-delay:.16s}.reveal.d3{transition-delay:.24s}.reveal.d4{transition-delay:.32s}
 
   @media(max-width:960px){
-    .svc-grid{grid-template-columns:1fr}
-    .svc-wide{grid-column:span 1;grid-template-columns:1fr}
-    .how-steps{grid-template-columns:repeat(3,1fr);gap:20px}
-    .team-grid{grid-template-columns:1fr;max-width:420px}
+    .hero-top{grid-template-columns:1fr;gap:32px}
+    .hero-brand{display:none}
+    .svc-grid,.svc-row3{grid-template-columns:1fr}
+    .how-steps{grid-template-columns:repeat(3,1fr);gap:16px}
+    .team-grid{grid-template-columns:1fr;max-width:440px}
+    .about-grid{grid-template-columns:1fr;gap:36px}
+    .hero-bar-inner{grid-template-columns:1fr;gap:20px}
   }
   @media(max-width:768px){
-    .how-steps{grid-template-columns:1fr;max-width:300px;margin:0 auto;gap:24px}
-    section{padding:64px 0}
-    .hero{padding:72px 0 80px}
+    .how-steps{grid-template-columns:1fr;max-width:320px;margin:0 auto;gap:12px}
+    section{padding:72px 0}
+    .hero{padding:60px 0 0}
+    .hero-top{padding-bottom:60px}
     nav ul{display:none}
-    .cta-box{padding:48px 24px;border-radius:18px}
+    .cta-box{padding:52px 24px;border-radius:16px}
     .foot{flex-direction:column;text-align:center}
     .foot-info{text-align:center}
-    .about-layout{grid-template-columns:1fr;gap:0}
-    .about-bar{display:none}
+    .cta{padding:72px 0}
+    .nav{height:68px}
+    .logo-wrap svg{height:44px}
   }
   @media(max-width:480px){
-    h1{font-size:34px}
+    h1{font-size:30px}
     .container{padding:0 20px}
   }
 </style>
@@ -156,11 +179,14 @@
 
 <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
   <symbol id="ico-wa" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.966-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></symbol>
-  <symbol id="logo" viewBox="0 0 360 80" fill="none">
-    <g transform="translate(40,40)"><path d="M16,-1.5 A17,17 0 1,0 12,14" stroke="currentColor" stroke-width="3.2" fill="none" stroke-linecap="round"/><path d="M14,13 A17,17 0 0,0 16,-1.5" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" opacity=".35" transform="translate(1.5,1)"/></g>
-    <line x1="78" y1="16" x2="78" y2="64" stroke="currentColor" opacity=".15" stroke-width="1"/>
-    <text x="96" y="46" font-family="'Montserrat','Helvetica Neue',sans-serif" font-size="28" font-weight="400" letter-spacing="8" fill="currentColor">COLUMEN</text>
-    <text x="96" y="64" font-family="'Montserrat','Helvetica Neue',sans-serif" font-size="10.5" font-weight="400" letter-spacing="4.5" fill="currentColor" opacity=".5">LEGAL &amp; NOTARIAL</text>
+  <symbol id="logo" viewBox="0 0 420 90" fill="none">
+    <g transform="translate(42,45)"><path d="M18,-2 A20,20 0 1,0 14,16" stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round"/><path d="M16,15 A20,20 0 0,0 18,-2" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" opacity=".3" transform="translate(1.5,1)"/></g>
+    <line x1="88" y1="16" x2="88" y2="74" stroke="currentColor" opacity=".12" stroke-width="1"/>
+    <text x="106" y="52" font-family="'Lora',Georgia,serif" font-size="34" font-weight="600" letter-spacing="7" fill="currentColor">COLUMEN</text>
+    <text x="106" y="74" font-family="'Inter','Helvetica Neue',sans-serif" font-size="12" font-weight="400" letter-spacing="5" fill="currentColor" opacity=".45">LEGAL &amp; NOTARIAL</text>
+  </symbol>
+  <symbol id="logo-big" viewBox="0 0 320 320" fill="none">
+    <g transform="translate(160,160)"><path d="M90,-10 A105,105 0 1,0 72,82" stroke="currentColor" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M78,78 A105,105 0 0,0 90,-10" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round" opacity=".2" transform="translate(5,5)"/></g>
   </symbol>
   <symbol id="ico-building" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 012-2h10a2 2 0 012 2v16"/></symbol>
   <symbol id="ico-file" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
@@ -181,28 +207,53 @@
       <li><a href="#contacto">Contacto</a></li>
     </ul></nav>
     <a href="https://wa.me/5492617571910?text=Hola%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" class="nav-cta">
-      <svg width="14" height="14" aria-hidden="true"><use href="#ico-wa"/></svg> Consulta
+      <svg width="15" height="15" aria-hidden="true"><use href="#ico-wa"/></svg> Consulta
     </a>
   </div>
 </header>
 
 <section class="hero">
-  <div class="container hero-inner">
-    <div class="label reveal">Estudio jurídico y notarial · Mendoza</div>
-    <h1 class="reveal d1">Un estudio tradicional<br>con la <em class="it">comodidad digital.</em></h1>
-    <p class="hero-sub reveal d2">Asesoramiento jurídico y notarial 100% online. Respondemos en 24 hs y te damos un plan claro desde el inicio.</p>
-    <div class="hero-cta reveal d3">
-      <a href="https://wa.me/5492617571910?text=Hola%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" class="btn btn-wa">
-        <svg width="17" height="17" aria-hidden="true"><use href="#ico-wa"/></svg> Escribinos por WhatsApp
-      </a>
-      <a href="#servicios" class="btn btn-line-light">Ver servicios</a>
+  <div class="container">
+    <div class="hero-top">
+      <div class="hero-text">
+        <div class="label reveal">Estudio jurídico y notarial · Mendoza</div>
+        <h1 class="reveal d1">Un estudio tradicional con la <em class="it">comodidad digital.</em></h1>
+        <p class="hero-sub reveal d2">Asesoramiento jurídico y notarial 100% online. Respondemos en 24 hs y te damos un plan claro desde el inicio.</p>
+        <div class="hero-cta reveal d3">
+          <a href="https://wa.me/5492617571910?text=Hola%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" class="btn btn-wa">
+            <svg width="17" height="17" aria-hidden="true"><use href="#ico-wa"/></svg> Escribinos por WhatsApp
+          </a>
+          <a href="#servicios" class="btn btn-light">Ver servicios</a>
+        </div>
+      </div>
+      <div class="hero-brand reveal d2">
+        <svg><use href="#logo-big"/></svg>
+      </div>
+    </div>
+  </div>
+  <div class="hero-bar">
+    <div class="container">
+      <div class="hero-bar-inner">
+        <div class="hero-bar-item reveal">
+          <div class="hero-bar-num">30+</div>
+          <div class="hero-bar-label">Años de experiencia profesional</div>
+        </div>
+        <div class="hero-bar-item reveal d1">
+          <div class="hero-bar-num">100%</div>
+          <div class="hero-bar-label">Atención digital y online</div>
+        </div>
+        <div class="hero-bar-item reveal d2">
+          <div class="hero-bar-num">24hs</div>
+          <div class="hero-bar-label">Tiempo de primera respuesta</div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<section id="servicios">
+<section id="servicios" class="bg-cream">
   <div class="container">
-    <div class="sec-head reveal">
+    <div class="sec-head sec-center reveal">
       <div class="label">Áreas de práctica</div>
       <h2>Lo que hacemos <em class="it">por vos.</em></h2>
     </div>
@@ -227,7 +278,7 @@
         </ul>
       </article>
     </div>
-    <div class="svc-wide" style="margin-top:16px">
+    <div class="svc-row3">
       <article class="service reveal">
         <div class="service-ico"><svg><use href="#ico-briefcase"/></svg></div>
         <h3>Sociedades y negocios</h3>
@@ -262,7 +313,7 @@
 
 <section class="how" id="como">
   <div class="container">
-    <div class="sec-head reveal">
+    <div class="sec-head sec-center reveal">
       <div class="label">Cómo trabajamos</div>
       <h2>Un proceso <em class="it">claro</em> de punta a punta.</h2>
     </div>
@@ -298,20 +349,31 @@
   </div>
 </section>
 
-<section id="nosotros">
+<section id="nosotros" class="bg-white">
   <div class="container">
     <div class="sec-head reveal">
       <div class="label">Quiénes somos</div>
       <h2>Columen <em class="it">Legal &amp; Notarial</em></h2>
     </div>
-    <div class="about-layout">
-      <div class="about-bar reveal"></div>
+    <div class="about-grid">
       <div class="about-text reveal">
         <p>Somos un equipo de abogados y escribanos con base en Mendoza, dedicado a brindar asesoramiento legal y notarial de manera clara, ágil y profesional.</p>
         <p>En Columen trabajamos con un modelo moderno, pensado para simplificar la relación entre el cliente y el servicio jurídico-notarial. Integramos atención personalizada, procesos eficientes y una red de profesionales especializados para dar respuestas concretas a cada situación.</p>
         <p>Nuestra propuesta combina la experiencia de años de ejercicio profesional con una forma de trabajo 100% online, que permite acceder al asesoramiento de manera simple, ordenada y sin desplazamientos innecesarios.</p>
-        <p>El valor de nuestro trabajo no está solo en resolver cuestiones legales, sino en que cada cliente comprenda su situación y pueda tomar decisiones con seguridad.</p>
-        <p>Columen Legal &amp; Notarial nace con ese propósito: ofrecer un servicio jurídico y notarial integrado, adaptado a las nuevas formas de trabajo y enfocado en la claridad, la confianza y el tiempo del cliente.</p>
+      </div>
+      <div class="about-sidebar reveal d1">
+        <div class="about-stat">
+          <div class="about-stat-num">30+</div>
+          <div class="about-stat-label">Años de ejercicio profesional</div>
+        </div>
+        <div class="about-stat">
+          <div class="about-stat-num">24</div>
+          <div class="about-stat-label">Años en función notarial</div>
+        </div>
+        <div class="about-stat">
+          <div class="about-stat-num">100%</div>
+          <div class="about-stat-label">Modelo de trabajo online</div>
+        </div>
       </div>
     </div>
   </div>
@@ -319,7 +381,7 @@
 
 <section class="team" id="equipo">
   <div class="container">
-    <div class="sec-head reveal">
+    <div class="sec-head sec-center reveal">
       <div class="label">Equipo</div>
       <h2>Profesionales a tu <em class="it">servicio.</em></h2>
     </div>
@@ -347,7 +409,7 @@
   </div>
 </section>
 
-<section class="cta" id="contacto">
+<section class="cta bg-white" id="contacto">
   <div class="container">
     <div class="cta-box reveal">
       <div class="label">Contacto</div>
