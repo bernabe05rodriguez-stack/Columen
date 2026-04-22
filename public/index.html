@@ -47,26 +47,24 @@
   .btn-light:hover{background:var(--cream);color:var(--navy);border-color:var(--cream)}
 
   header{position:sticky;top:0;z-index:50;background:var(--navy);border-bottom:1px solid rgba(255,255,255,.06)}
-  .nav{display:flex;align-items:center;justify-content:space-between;height:80px}
+  .nav{display:flex;align-items:center;justify-content:space-between;height:96px}
   .logo-wrap{display:flex;align-items:center;color:var(--cream);flex-shrink:0}
-  .logo-wrap svg{height:52px;width:auto;max-width:260px}
+  .logo-wrap svg{height:72px;width:auto;max-width:340px}
   nav ul{display:flex;gap:28px;list-style:none}
   nav a{font-size:14px;color:rgba(244,240,228,.55);transition:color .2s}
   nav a:hover{color:var(--cream)}
   .nav-cta{background:var(--gold);color:var(--cream);font-size:14px;padding:10px 22px;border-radius:8px;font-weight:500;display:inline-flex;align-items:center;gap:8px;transition:background .2s;border:none;cursor:pointer}
   .nav-cta:hover{background:var(--gold-soft)}
 
-  .hero{background:var(--navy);padding:80px 0 0;position:relative}
-  .hero-top{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center;padding-bottom:80px}
-  .hero-text{position:relative;z-index:1}
-  .hero .label{color:var(--gold-soft);margin-bottom:20px;font-size:14px}
-  .hero h1{color:var(--cream);margin-bottom:20px}
-  .hero h1 em.it{color:var(--gold-soft)}
-  .hero-sub{font-size:17px;line-height:1.7;color:rgba(244,240,228,.55);margin-bottom:36px}
-  .hero-cta{display:flex;gap:12px;flex-wrap:wrap}
-  .hero-brand{display:flex;align-items:center;justify-content:center;overflow:hidden}
-  .hero-brand svg{width:280px;height:280px;color:var(--cream);opacity:.1}
-  .hero-bar{background:var(--cream);padding:48px 0;border-bottom:1px solid var(--cream-border)}
+  .hero{background:var(--white);padding:96px 0 0;position:relative}
+  .hero-top{display:block;padding-bottom:96px;text-align:center}
+  .hero-text{position:relative;z-index:1;max-width:820px;margin:0 auto}
+  .hero .label{color:var(--gold);margin-bottom:20px;font-size:14px}
+  .hero h1{color:var(--ink);margin-bottom:20px}
+  .hero h1 em.it{color:var(--gold)}
+  .hero-sub{font-size:17px;line-height:1.7;color:var(--ink-55);margin-bottom:36px}
+  .hero-cta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .hero-bar{background:var(--cream);padding:48px 0;border-top:1px solid var(--cream-border);border-bottom:1px solid var(--cream-border)}
   .hero-bar-inner{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;text-align:center}
   .hero-bar-item{padding:0 16px}
   .hero-bar-num{font-family:'Lora',serif;font-size:32px;font-weight:700;color:var(--navy);margin-bottom:4px}
@@ -81,6 +79,10 @@
   .bg-cream{background:var(--cream)}
   .bg-white{background:var(--white)}
   .bg-navy{background:var(--navy);color:var(--cream)}
+  .bg-navy .sec-head h2{color:var(--cream)}
+  .bg-navy .sec-head h2 em.it{color:var(--gold-soft)}
+  .bg-navy .label{color:var(--gold-soft)}
+  .bg-navy .service{background:var(--white)}
 
   .svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
   .svc-row3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
@@ -94,33 +96,25 @@
   .service ul li{font-size:14.5px;line-height:1.65;color:var(--ink-80);padding:4px 0 4px 18px;position:relative}
   .service ul li::before{content:"";position:absolute;left:0;top:12px;width:5px;height:5px;border-radius:50%;border:1.5px solid var(--gold-soft)}
 
-  .how{background:var(--navy);color:var(--cream);padding:100px 0}
-  .how .sec-head h2{color:var(--cream)}
-  .how .sec-head h2 em.it{color:var(--gold-soft)}
-  .how .label{color:var(--gold-soft)}
-  .how-intro{max-width:620px;font-size:16px;line-height:1.75;color:rgba(244,240,228,.45);margin-bottom:56px}
-  .how-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;overflow:hidden}
-  .step{text-align:center;padding:28px 12px;border:1px solid rgba(255,255,255,.08);border-radius:var(--r);transition:border-color .2s}
-  .step:hover{border-color:rgba(255,255,255,.18)}
-  .step-num{font-family:'Lora',serif;font-size:28px;font-weight:700;color:var(--gold-soft);margin-bottom:12px}
-  .step h3{font-size:14px;font-weight:600;color:var(--cream);margin-bottom:8px}
-  .step p{font-size:13px;line-height:1.55;color:rgba(244,240,228,.4);max-width:160px;margin:0 auto}
-  .how-note{margin-top:56px;padding-top:28px;border-top:1px solid rgba(255,255,255,.06);font-size:14px;color:rgba(244,240,228,.3);max-width:620px}
+  .how{background:var(--white);padding:100px 0}
+  .how-intro{max-width:780px;margin:0 auto 56px;font-size:16px;line-height:1.75;color:var(--ink-55);text-align:center}
+  .how-steps{display:grid;grid-template-columns:repeat(5,1fr);gap:18px}
+  .step{text-align:center;padding:32px 20px;border:1px solid #e8e4da;border-radius:var(--r);background:var(--white);transition:border-color .2s,box-shadow .2s}
+  .step:hover{border-color:var(--gold-soft);box-shadow:0 6px 20px rgba(0,0,0,.05)}
+  .step-num{font-family:'Lora',serif;font-size:28px;font-weight:700;color:var(--gold);margin-bottom:12px}
+  .step h3{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:8px}
+  .step p{font-size:13.5px;line-height:1.55;color:var(--ink-55);max-width:none;margin:0 auto}
+  .how-note{margin:56px auto 0;padding-top:28px;border-top:1px solid #e8e4da;font-size:14px;color:var(--ink-55);max-width:780px;text-align:center}
 
-  .about-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start;max-width:940px}
+  .about-text{max-width:800px;margin:0 auto;text-align:center}
   .about-text p{font-size:16px;line-height:1.85;color:var(--ink-80);margin-bottom:18px}
   .about-text p:last-child{margin-bottom:0}
   .about-text p:first-child{font-size:18px;color:var(--ink);font-weight:500;line-height:1.6}
-  .about-sidebar{border-left:3px solid var(--gold);padding-left:28px}
-  .about-sidebar .about-stat{margin-bottom:28px}
-  .about-sidebar .about-stat:last-child{margin-bottom:0}
-  .about-stat-num{font-family:'Lora',serif;font-size:clamp(28px,4vw,36px);font-weight:700;color:var(--navy);line-height:1}
-  .about-stat-label{font-size:14px;color:var(--ink-55);margin-top:4px}
 
-  .team{background:var(--cream);padding:100px 0}
+  .team{background:var(--white);padding:100px 0}
   .team-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-  .team-card{background:var(--white);border:1px solid #e8e4da;border-radius:var(--r);padding:36px 28px;transition:box-shadow .2s}
-  .team-card:hover{box-shadow:0 6px 20px rgba(0,0,0,.06)}
+  .team-card{background:var(--white);border:1px solid #e8e4da;border-radius:var(--r);padding:36px 28px;transition:box-shadow .2s;box-shadow:0 2px 12px rgba(0,0,0,.04)}
+  .team-card:hover{box-shadow:0 6px 20px rgba(0,0,0,.08)}
   .team-role{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:500;margin-bottom:14px}
   .team-card h3{font-size:19px;margin-bottom:10px}
   .team-cred{font-size:13px;color:var(--ink-55);line-height:1.55;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid #e8e4da}
@@ -137,7 +131,7 @@
 
   footer{background:var(--navy);color:rgba(244,240,228,.35);padding:40px 0;border-top:1px solid rgba(255,255,255,.04)}
   .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:20px;font-size:13.5px}
-  .foot .logo-wrap svg{height:40px}
+  .foot .logo-wrap svg{height:60px;max-width:300px}
   .foot-info{text-align:right;line-height:1.7}
 
   .wa-float{position:fixed;bottom:24px;right:24px;z-index:60;width:56px;height:56px;border-radius:50%;background:#25d366;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(37,211,102,.3);transition:background .2s}
@@ -162,13 +156,9 @@
   .mobile-overlay-footer .btn-wa{width:100%;justify-content:center;padding:16px 24px;font-size:15px;border-radius:10px}
 
   @media(max-width:960px){
-    .hero-top{grid-template-columns:1fr;gap:24px}
-    .hero-brand{display:none}
     .svc-grid,.svc-row3{grid-template-columns:1fr}
     .how-steps{grid-template-columns:repeat(3,1fr);gap:14px}
     .team-grid{grid-template-columns:1fr;max-width:460px;margin:0 auto}
-    .about-grid{grid-template-columns:1fr;gap:40px}
-    .about-sidebar{border-left:none;padding-left:0;display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding-top:24px;border-top:3px solid var(--gold)}
   }
   @media(max-width:768px){
     nav ul{display:none}
@@ -186,9 +176,9 @@
     .hero-bar-num{font-size:24px}
     .hero-bar-label{font-size:11px}
     .hero-bar-item{padding:0 6px}
-    .how-steps{grid-template-columns:1fr;gap:8px}
+    .how-steps{grid-template-columns:1fr;gap:10px}
     .step{text-align:left;display:grid;grid-template-columns:44px 1fr;gap:12px;align-items:start;padding:18px 16px}
-    .step-num{margin:0;font-size:22px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.12);border-radius:50%}
+    .step-num{margin:0;font-size:22px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--gold-soft);border-radius:50%}
     .step h3,.step p{text-align:left;max-width:none;margin:0}
     .step h3{margin-bottom:3px;font-size:14px}
     .step p{font-size:13px}
@@ -202,13 +192,12 @@
     .cta{padding:56px 0}
     .foot{flex-direction:column;text-align:center;gap:14px}
     .foot-info{text-align:center;font-size:12px}
-    .nav{height:60px}
-    .logo-wrap svg{height:36px;max-width:200px}
-    .foot .logo-wrap svg{height:30px;max-width:170px}
+    .nav{height:64px}
+    .logo-wrap svg{height:46px;max-width:240px}
+    .foot .logo-wrap svg{height:44px;max-width:220px}
     .team-note,.how-note{font-size:12px}
     .how-intro{font-size:14px}
     .container{padding:0 16px}
-    .about-sidebar{grid-template-columns:repeat(3,1fr)}
     .service{padding:24px 18px}
     .service h3{font-size:17px}
     .team-card{padding:28px 18px}
@@ -221,8 +210,6 @@
     .sec-head h2{font-size:21px}
     .hero-bar-num{font-size:20px}
     .hero-bar-label{font-size:10px}
-    .about-sidebar{grid-template-columns:1fr;gap:12px}
-    .about-stat{display:flex;align-items:baseline;gap:10px}
     .nav-cta{font-size:12px;padding:8px 14px}
     .nav-cta svg{width:12px;height:12px}
   }
@@ -281,11 +268,8 @@
           <a href="https://wa.me/5492617571910?text=Hola%2C%20quiero%20hacer%20una%20consulta" target="_blank" rel="noopener" class="btn btn-wa">
             <svg width="17" height="17" aria-hidden="true"><use href="#ico-wa"/></svg> Escribinos por WhatsApp
           </a>
-          <a href="#servicios" class="btn btn-light">Ver servicios</a>
+          <a href="#servicios" class="btn btn-line">Ver servicios</a>
         </div>
-      </div>
-      <div class="hero-brand reveal d2">
-        <svg><use href="#logo-big"/></svg>
       </div>
     </div>
   </div>
@@ -309,7 +293,7 @@
   </div>
 </section>
 
-<section id="servicios" class="bg-cream">
+<section id="servicios" class="bg-navy">
   <div class="container">
     <div class="sec-head sec-center reveal">
       <div class="label">Áreas de práctica</div>
@@ -409,30 +393,13 @@
 
 <section id="nosotros" class="bg-white">
   <div class="container">
-    <div class="sec-head reveal">
+    <div class="sec-head sec-center reveal">
       <div class="label">Quiénes somos</div>
-      <h2>Columen <em class="it">Legal &amp; Notarial</em></h2>
     </div>
-    <div class="about-grid">
-      <div class="about-text reveal">
-        <p>Somos un equipo de abogados y escribanos con base en Mendoza, dedicado a brindar asesoramiento legal y notarial de manera clara, ágil y profesional.</p>
-        <p>En Columen trabajamos con un modelo moderno, pensado para simplificar la relación entre el cliente y el servicio jurídico-notarial. Integramos atención personalizada, procesos eficientes y una red de profesionales especializados para dar respuestas concretas a cada situación.</p>
-        <p>Nuestra propuesta combina la experiencia de años de ejercicio profesional con una forma de trabajo 100% online, que permite acceder al asesoramiento de manera simple, ordenada y sin desplazamientos innecesarios.</p>
-      </div>
-      <div class="about-sidebar reveal d1">
-        <div class="about-stat">
-          <div class="about-stat-num">30+</div>
-          <div class="about-stat-label">Años de ejercicio profesional</div>
-        </div>
-        <div class="about-stat">
-          <div class="about-stat-num">24</div>
-          <div class="about-stat-label">Años en función notarial</div>
-        </div>
-        <div class="about-stat">
-          <div class="about-stat-num">100%</div>
-          <div class="about-stat-label">Modelo de trabajo online</div>
-        </div>
-      </div>
+    <div class="about-text reveal">
+      <p>Somos un equipo de abogados y escribanos con base en Mendoza, dedicado a brindar asesoramiento legal y notarial de manera clara, ágil y profesional.</p>
+      <p>En Columen trabajamos con un modelo moderno, pensado para simplificar la relación entre el cliente y el servicio jurídico-notarial. Integramos atención personalizada, procesos eficientes y una red de profesionales especializados para dar respuestas concretas a cada situación.</p>
+      <p>Nuestra propuesta combina la experiencia de años de ejercicio profesional con una forma de trabajo 100% online, que permite acceder al asesoramiento de manera simple, ordenada y sin desplazamientos innecesarios.</p>
     </div>
   </div>
 </section>
@@ -445,14 +412,14 @@
     </div>
     <div class="team-grid">
       <div class="team-card reveal">
-        <div class="team-role">Dirección Legal</div>
+        <div class="team-role">Dirección Área Legal</div>
         <h3>Dr. Pablo Javier Olaiz</h3>
         <div class="team-cred">Abogado · Mat. Prof. Nº 4594 · Mat. Federal T. 76 F. 894<br>Magíster en Derecho Empresario · MBA</div>
         <p>A cargo de la dirección del área legal, con treinta años de experiencia. Responsable del análisis estratégico y del seguimiento integral de las soluciones propuestas.</p>
       </div>
       <div class="team-card reveal d1">
-        <div class="team-role">Dirección Notarial</div>
-        <h3>Registro Notarial Nº 646</h3>
+        <div class="team-role">Dirección Área Notarial</div>
+        <h3>Esc. Sonia Jimena Olaiz</h3>
         <div class="team-cred">Titular de Registro Notarial Nº 646 de Capital</div>
         <p>Responsable del área notarial, con 24 años de experiencia en el ejercicio de la función notarial.</p>
       </div>
