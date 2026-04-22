@@ -89,7 +89,7 @@
   .bg-navy .service h3{color:var(--navy)}
   .bg-navy .service ul li{color:var(--ink-80)}
 
-  .svc-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+  .svc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-bottom:18px}
   .svc-row3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
   .service{background:var(--white);border:1px solid #e8e4da;border-radius:var(--r);padding:32px 28px;transition:box-shadow .2s}
   .service:hover{box-shadow:0 6px 20px rgba(0,0,0,.06)}
@@ -244,6 +244,7 @@
   <symbol id="ico-briefcase" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/></symbol>
   <symbol id="ico-gavel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3.5l6 6M4 20l6.5-6.5M14.5 9.5l-5 5M9.5 14.5l-5 5M15.5 3.5l5 5"/><path d="M2 22h20"/></symbol>
   <symbol id="ico-stamp" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21h14M7 21v-2a2 2 0 012-2h6a2 2 0 012 2v2M12 13V7M8 13h8a2 2 0 012 2H6a2 2 0 012-2z"/><circle cx="12" cy="5" r="2"/></symbol>
+  <symbol id="ico-shield" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 3v7c0 4.5-3.5 8.5-8 10-4.5-1.5-8-5.5-8-10V5l8-3z"/><path d="M9 12l2 2 4-4"/></symbol>
 </svg>
 
 <header>
@@ -325,6 +326,15 @@
           <li>Revisión</li>
           <li>Negociación</li>
           <li>Reclamos</li>
+        </ul>
+      </article>
+      <article class="service reveal d2">
+        <div class="service-ico"><svg><use href="#ico-shield"/></svg></div>
+        <h3>Reclamos e indemnizaciones</h3>
+        <ul>
+          <li>Accidentes de tránsito</li>
+          <li>Problemas con seguros</li>
+          <li>Defensa del consumidor</li>
         </ul>
       </article>
     </div>
