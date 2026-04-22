@@ -50,8 +50,9 @@
 
   header{position:sticky;top:0;z-index:50;background:var(--navy);border-bottom:1px solid rgba(255,255,255,.06)}
   .nav{display:flex;align-items:center;gap:20px;height:96px}
-  .logo-wrap{display:flex;align-items:center;color:var(--cream);flex-shrink:0}
-  .logo-wrap svg{height:72px;width:auto;max-width:340px}
+  .logo-wrap{display:flex;align-items:center;color:var(--cream);flex-shrink:1;min-width:0}
+  .logo-wrap svg{height:72px;width:auto;max-width:340px;display:block}
+  .logo-wrap .logo-m{display:none}
   .nav > nav{flex:1;display:flex;justify-content:center}
   nav ul{display:flex;gap:28px;list-style:none}
   nav a{font-size:14px;color:rgba(244,240,228,.55);transition:color .2s}
@@ -198,7 +199,8 @@
     .foot{flex-direction:column;text-align:center;gap:14px}
     .foot-info{text-align:center;font-size:12px}
     .nav{height:64px;gap:10px}
-    .logo-wrap svg{height:42px;max-width:220px}
+    .logo-wrap .logo-d{display:none}
+    .logo-wrap .logo-m{display:block;height:40px;width:auto;max-width:180px}
     .nav-cta{font-size:12.5px;padding:8px 14px;gap:6px;white-space:nowrap}
     .nav-cta svg{width:13px;height:13px}
     .menu-btn{padding:6px}
@@ -218,7 +220,7 @@
     .sec-head h2{font-size:21px}
     .hero-bar-num{font-size:20px}
     .hero-bar-label{font-size:10px}
-    .logo-wrap svg{height:38px;max-width:190px}
+    .logo-wrap .logo-m{height:36px;max-width:160px}
     .nav-cta{font-size:11.5px;padding:7px 11px}
     .nav-cta svg{width:12px;height:12px}
     .container{padding:0 14px}
@@ -235,6 +237,10 @@
     <text x="106" y="50" font-family="'Lora',Georgia,serif" font-size="32" font-weight="600" letter-spacing="6" fill="currentColor">COLUMEN</text>
     <text x="106" y="72" font-family="'Inter',sans-serif" font-size="11.5" font-weight="400" letter-spacing="4.5" fill="currentColor" opacity=".45">LEGAL &amp; NOTARIAL</text>
   </symbol>
+  <symbol id="logo-m" viewBox="0 0 240 56" fill="none">
+    <g transform="translate(24,28)"><path d="M13,-1.5 A15,15 0 1,0 10,12" stroke="currentColor" stroke-width="3" fill="none" stroke-linecap="round"/></g>
+    <text x="56" y="37" font-family="'Lora',Georgia,serif" font-size="26" font-weight="600" letter-spacing="4.5" fill="currentColor">COLUMEN</text>
+  </symbol>
   <symbol id="logo-big" viewBox="0 0 320 320" fill="none">
     <g transform="translate(160,160)"><path d="M90,-10 A105,105 0 1,0 72,82" stroke="currentColor" stroke-width="8" fill="none" stroke-linecap="round"/><path d="M78,78 A105,105 0 0,0 90,-10" stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round" opacity=".2" transform="translate(5,5)"/></g>
   </symbol>
@@ -249,7 +255,10 @@
 
 <header>
   <div class="container nav">
-    <a href="#" class="logo-wrap" aria-label="Columen — Inicio"><svg><use href="#logo"/></svg></a>
+    <a href="#" class="logo-wrap" aria-label="Columen — Inicio">
+      <svg class="logo-d"><use href="#logo"/></svg>
+      <svg class="logo-m"><use href="#logo-m"/></svg>
+    </a>
     <nav aria-label="Navegación principal"><ul>
       <li><a href="#servicios">Servicios</a></li>
       <li><a href="#como">Cómo trabajamos</a></li>
