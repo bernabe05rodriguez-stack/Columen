@@ -19,8 +19,34 @@ const PUBLIC_URL = process.env.PUBLIC_URL || 'https://redhawk-columen.bm6z1s.eas
 const fs = require('fs');
 const DB_DIR = fs.existsSync('/data') ? '/data' : './data';
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
-const db = new Database(path.join(DB_DIR, 'columen.db'));
+const DB_PATH = path.join(DB_DIR, 'columen.db');
+const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
+
+const BACKUP_DIR = path.join(DB_DIR, 'backups');
+if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+const BACKUP_KEEP = 50;
+let backupRunning = false;
+async function snapshotDB(reason = 'periodic') {
+  if (backupRunning) return;
+  backupRunning = true;
+  try {
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+    const dst = path.join(BACKUP_DIR, `columen-${ts}-${reason}.db`);
+    await db.backup(dst);
+    const files = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.db')).sort();
+    while (files.length > BACKUP_KEEP) {
+      try { fs.unlinkSync(path.join(BACKUP_DIR, files.shift())); } catch {}
+    }
+    console.log('[backup] snapshot', reason, path.basename(dst));
+  } catch (e) {
+    console.error('[backup] error', e.message);
+  } finally {
+    backupRunning = false;
+  }
+}
+setInterval(() => snapshotDB('hourly'), 60 * 60 * 1000);
+snapshotDB('startup');
 db.exec(`
   CREATE TABLE IF NOT EXISTS consultas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -112,6 +138,7 @@ app.post('/api/webhook', (req, res) => {
     data.email || '',
     data.consulta || ''
   );
+  snapshotDB('consulta');
   res.json({ status: 'ok' });
 });
 
@@ -252,7 +279,7 @@ app.get('/admin', (req, res) => {
 </style></head><body>
 <div class="topbar">
   <h1>COLUMEN</h1>
-  <div><a href="/admin" style="margin-right:18px">Consultas</a><a href="/admin/inbox" style="margin-right:18px">Inbox</a><a href="/admin/logout">Salir</a></div>
+  <div><a href="/admin" style="margin-right:18px">Consultas</a><a href="/admin/inbox" style="margin-right:18px">Inbox</a><a href="/admin/backup" style="margin-right:18px">Backup</a><a href="/admin/logout">Salir</a></div>
 </div>
 <div class="stats">
   <div class="stat"><div class="num">${totalAll}</div><div class="label">Total consultas</div></div>
@@ -295,6 +322,70 @@ ${filtered ? `<div class="filter-info">Mostrando ${total} de ${totalAll} consult
 })();
 </script>
 </body></html>`);
+});
+
+// --- Backups ---
+app.get('/admin/backup', (req, res) => {
+  if (!isAuthenticated(req)) return res.redirect('/admin/login');
+  const files = fs.existsSync(BACKUP_DIR)
+    ? fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.db')).sort().reverse()
+    : [];
+  const liveSize = fs.existsSync(DB_PATH) ? (fs.statSync(DB_PATH).size / 1024).toFixed(1) : '?';
+  const list = files.map(f => {
+    const size = (fs.statSync(path.join(BACKUP_DIR, f)).size / 1024).toFixed(1);
+    return `<tr><td><code>${escapeHtml(f)}</code></td><td>${size} KB</td><td><a href="/admin/backup/download?file=${encodeURIComponent(f)}">Descargar</a></td></tr>`;
+  }).join('');
+  res.send(`<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Backup - COLUMEN</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:#f4f0e4;color:#1c1c1c;min-height:100vh}
+  .topbar{background:#1c1c1c;color:#f4f0e4;padding:16px 28px;display:flex;justify-content:space-between;align-items:center}
+  .topbar h1{font-family:serif;font-size:20px;letter-spacing:.15em;font-weight:400}
+  .topbar a{color:#b8974a;font-size:13px;text-decoration:none;margin-left:18px}
+  .topbar a:hover{color:#f4f0e4}
+  .wrap{max-width:880px;margin:0 auto;padding:28px}
+  .card{background:#fff;border:1px solid #ddd6c4;border-radius:12px;padding:24px;margin-bottom:20px}
+  h2{font-family:serif;font-size:22px;margin-bottom:6px}
+  .sub{color:#8a6d2b;font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:18px}
+  .btn{display:inline-block;padding:10px 18px;background:#1c1c1c;color:#f4f0e4;border-radius:999px;text-decoration:none;font-weight:500;font-size:14px}
+  .btn:hover{background:#2a2a2a}
+  table{width:100%;border-collapse:collapse;margin-top:10px}
+  th{background:#1c1c1c;color:#f4f0e4;padding:10px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
+  td{padding:8px 10px;border-bottom:1px solid #eee8d9;font-size:13px}
+  td a{color:#8a6d2b;text-decoration:none;font-weight:500}
+  .warn{background:#fff3cd;border:1px solid #f0e6b6;color:#856404;padding:14px;border-radius:10px;margin-bottom:20px;font-size:14px;line-height:1.5}
+</style></head><body>
+<div class="topbar"><h1>COLUMEN</h1><div><a href="/admin">Consultas</a><a href="/admin/inbox">Inbox</a><a href="/admin/backup">Backup</a><a href="/admin/logout">Salir</a></div></div>
+<div class="wrap">
+  <div class="warn"><b>⚠️ Persistencia crítica</b>: los backups viven en <code>/data/backups/</code>. Si <code>/data</code> no tiene volumen montado en EasyPanel, se pierden en cada rebuild junto con la DB principal. Usá <b>Descargar DB actual</b> para guardar una copia off-site.</div>
+  <div class="card">
+    <h2>DB actual</h2>
+    <div class="sub">${liveSize} KB · ${DB_PATH}</div>
+    <a class="btn" href="/admin/backup/download">⬇ Descargar DB actual</a>
+  </div>
+  <div class="card">
+    <h2>Snapshots</h2>
+    <div class="sub">${files.length} backups · se conservan los últimos ${BACKUP_KEEP}</div>
+    ${files.length ? `<table><thead><tr><th>Archivo</th><th>Tamaño</th><th></th></tr></thead><tbody>${list}</tbody></table>` : '<p style="color:#999">No hay snapshots aún.</p>'}
+  </div>
+</div>
+</body></html>`);
+});
+
+app.get('/admin/backup/download', (req, res) => {
+  if (!isAuthenticated(req)) return res.redirect('/admin/login');
+  const f = req.query.file;
+  if (f) {
+    if (!/^columen-[\w\-:]+\.db$/.test(f)) return res.status(400).send('invalid filename');
+    const p = path.join(BACKUP_DIR, f);
+    if (!fs.existsSync(p)) return res.status(404).send('not found');
+    return res.download(p, f);
+  }
+  if (!fs.existsSync(DB_PATH)) return res.status(404).send('db not found');
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  res.download(DB_PATH, `columen-live-${ts}.db`);
 });
 
 // --- Admin Inbox (WhatsApp) ---
@@ -428,7 +519,7 @@ app.get('/admin/inbox', (req, res) => {
 </style></head><body>
 <div class="topbar">
   <h1>COLUMEN</h1>
-  <div class="r"><a href="/admin">Consultas</a><a href="/admin/inbox">Inbox</a><a href="/admin/logout">Salir</a></div>
+  <div class="r"><a href="/admin">Consultas</a><a href="/admin/inbox">Inbox</a><a href="/admin/backup">Backup</a><a href="/admin/logout">Salir</a></div>
 </div>
 <div class="layout">
   <div class="sidebar">
@@ -646,6 +737,7 @@ app.post('/consulta', (req, res) => {
   db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?, ?, ?, ?, ?, ?)').run(
     telefono || '', area || '', nombre || '', dni || '', email || '', consulta || ''
   );
+  snapshotDB('consulta');
   res.redirect(`/consulta?sent=1`);
 });
 
@@ -803,6 +895,7 @@ async function handleTextInFlow(from, text) {
     db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?,?,?,?,?,?)').run(
       from, final.area || '', final.nombre || '', final.dni || '', final.email || '', clean
     );
+    snapshotDB('consulta');
     clearState(from);
     return sendText(from, `Gracias ${final.nombre?.split(' ')[0] || ''}! Tu consulta de tipo *${final.area === 'juridico' ? 'Jurídico' : 'Notarial'}* fue registrada correctamente.\n\nUn profesional de COLUMEN se va a comunicar con vos a la brevedad.`);
   }
