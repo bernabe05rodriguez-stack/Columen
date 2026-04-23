@@ -299,7 +299,7 @@ ${filtered ? `<div class="filter-info">Mostrando ${total} de ${totalAll} consult
 
 // --- Admin Inbox (WhatsApp) ---
 function resolveName(tel) {
-  const row = db.prepare('SELECT nombre FROM consultas WHERE telefono = ? AND nombre != "" ORDER BY id DESC LIMIT 1').get(tel);
+  const row = db.prepare("SELECT nombre FROM consultas WHERE telefono = ? AND nombre != '' ORDER BY id DESC LIMIT 1").get(tel);
   if (row?.nombre) return row.nombre;
   const st = db.prepare('SELECT nombre FROM bot_state WHERE telefono = ? AND nombre IS NOT NULL').get(tel);
   return st?.nombre || '';
