@@ -103,6 +103,30 @@ function runMigration(name, fn) {
 runMigration('fix_tz_argentina_2026_04', () => {
   db.prepare("UPDATE consultas SET created_at = datetime(created_at, '-3 hours')").run();
 });
+runMigration('add_media_fields_2026_04', () => {
+  try { db.exec('ALTER TABLE messages ADD COLUMN media_id TEXT'); } catch {}
+  try { db.exec('ALTER TABLE messages ADD COLUMN media_mime TEXT'); } catch {}
+});
+runMigration('add_labels_2026_04', () => {
+  db.exec(`CREATE TABLE IF NOT EXISTS labels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL,
+    color TEXT DEFAULT '#8a6d2b',
+    created_at DATETIME DEFAULT (datetime('now','localtime'))
+  )`);
+  db.exec(`CREATE TABLE IF NOT EXISTS conversation_labels (
+    telefono TEXT,
+    label_id INTEGER,
+    PRIMARY KEY (telefono, label_id)
+  )`);
+  const existing = db.prepare('SELECT COUNT(*) as c FROM labels').get().c;
+  if (!existing) {
+    const colors = ['#1a5cb0', '#8a6d2b', '#c23b1e', '#2e7d32', '#6a1b9a'];
+    ['Jurídico','Notarial','Urgente','Cerrado','Seguimiento'].forEach((n,i) =>
+      db.prepare('INSERT OR IGNORE INTO labels (name, color) VALUES (?,?)').run(n, colors[i])
+    );
+  }
+});
 
 // Cleanup old sessions (older than 24h)
 db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
@@ -396,6 +420,12 @@ function resolveName(tel) {
   return st?.nombre || '';
 }
 
+function labelsForTel(tel) {
+  return db.prepare(`SELECT l.id, l.name, l.color FROM labels l
+    INNER JOIN conversation_labels cl ON cl.label_id = l.id
+    WHERE cl.telefono = ? ORDER BY l.name`).all(tel);
+}
+
 app.get('/admin/inbox/data', (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const convs = db.prepare(`
@@ -403,18 +433,63 @@ app.get('/admin/inbox/data', (req, res) => {
     FROM conversations
     ORDER BY last_at DESC
   `).all();
-  const withNames = convs.map(c => ({ ...c, nombre: resolveName(c.telefono) }));
+  const withNames = convs.map(c => ({ ...c, nombre: resolveName(c.telefono), labels: labelsForTel(c.telefono) }));
   const totalUnread = withNames.reduce((a, c) => a + (c.unread || 0), 0);
-  res.json({ conversations: withNames, totalUnread });
+  const allLabels = db.prepare('SELECT id, name, color FROM labels ORDER BY name').all();
+  res.json({ conversations: withNames, totalUnread, labels: allLabels });
+});
+
+app.get('/admin/labels', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  res.json({ labels: db.prepare('SELECT id, name, color FROM labels ORDER BY name').all() });
+});
+
+app.post('/admin/labels', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const name = (req.body?.name || '').trim();
+  const color = (req.body?.color || '#8a6d2b').trim();
+  if (!name) return res.status(400).json({ error: 'name required' });
+  try {
+    const r = db.prepare('INSERT INTO labels (name, color) VALUES (?,?)').run(name, color);
+    res.json({ id: r.lastInsertRowid, name, color });
+  } catch (e) {
+    if (String(e.message).includes('UNIQUE')) return res.status(409).json({ error: 'duplicate' });
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete('/admin/labels/:id', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const id = parseInt(req.params.id, 10);
+  db.prepare('DELETE FROM conversation_labels WHERE label_id = ?').run(id);
+  db.prepare('DELETE FROM labels WHERE id = ?').run(id);
+  res.json({ ok: true });
+});
+
+app.post('/admin/inbox/:tel/labels/:labelId', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const tel = req.params.tel;
+  const labelId = parseInt(req.params.labelId, 10);
+  db.prepare('INSERT OR IGNORE INTO conversation_labels (telefono, label_id) VALUES (?,?)').run(tel, labelId);
+  res.json({ ok: true, labels: labelsForTel(tel) });
+});
+
+app.delete('/admin/inbox/:tel/labels/:labelId', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const tel = req.params.tel;
+  const labelId = parseInt(req.params.labelId, 10);
+  db.prepare('DELETE FROM conversation_labels WHERE telefono = ? AND label_id = ?').run(tel, labelId);
+  res.json({ ok: true, labels: labelsForTel(tel) });
 });
 
 app.get('/admin/inbox/:tel/messages', (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const tel = req.params.tel;
-  const messages = db.prepare('SELECT id, direction, type, body, created_at FROM messages WHERE telefono = ? ORDER BY id ASC LIMIT 500').all(tel);
+  const messages = db.prepare('SELECT id, direction, type, body, created_at, media_id, media_mime FROM messages WHERE telefono = ? ORDER BY id ASC LIMIT 500').all(tel);
   let conv = db.prepare('SELECT * FROM conversations WHERE telefono = ?').get(tel);
   if (!conv) conv = { telefono: tel, bot_paused: 0, unread: 0 };
   const nombre = resolveName(tel);
+  const labels = labelsForTel(tel);
   const lastIn = db.prepare("SELECT created_at FROM messages WHERE telefono = ? AND direction = 'in' ORDER BY id DESC LIMIT 1").get(tel);
   let canSend = true;
   if (lastIn?.created_at) {
@@ -423,7 +498,86 @@ app.get('/admin/inbox/:tel/messages', (req, res) => {
   } else {
     canSend = false;
   }
-  res.json({ messages, conversation: { ...conv, nombre }, canSend });
+  res.json({ messages, conversation: { ...conv, nombre, labels }, canSend });
+});
+
+// Send image (base64 JSON body)
+app.post('/admin/inbox/:tel/send-image', express.json({ limit: '16mb' }), async (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const tel = req.params.tel;
+  const { filename, mime, data, caption } = req.body || {};
+  if (!data || !mime) return res.status(400).json({ error: 'missing file' });
+  if (!WA_TOKEN || !WA_PHONE_ID) return res.status(500).json({ error: 'wa not configured' });
+  try {
+    const buf = Buffer.from(data, 'base64');
+    const form = new FormData();
+    form.append('messaging_product', 'whatsapp');
+    form.append('type', mime);
+    form.append('file', new Blob([buf], { type: mime }), filename || 'upload.bin');
+    const up = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${WA_TOKEN}` },
+      body: form,
+    });
+    const upJson = await up.json();
+    if (!up.ok || !upJson.id) {
+      console.error('[WA] media upload error', JSON.stringify(upJson));
+      return res.status(502).json({ error: 'upload failed', detail: upJson.error?.message || 'unknown' });
+    }
+    const mediaId = upJson.id;
+    const isImage = mime.startsWith('image/');
+    const isVideo = mime.startsWith('video/');
+    const isAudio = mime.startsWith('audio/');
+    const type = isImage ? 'image' : isVideo ? 'video' : isAudio ? 'audio' : 'document';
+    const payload = {
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: tel,
+      type,
+      [type]: type === 'document' ? { id: mediaId, filename: filename || 'archivo', caption: caption || undefined } : { id: mediaId, caption: caption || undefined },
+    };
+    const exists = db.prepare('SELECT telefono FROM conversations WHERE telefono = ?').get(tel);
+    if (exists) db.prepare('UPDATE conversations SET bot_paused = 1 WHERE telefono = ?').run(tel);
+    else db.prepare("INSERT INTO conversations (telefono, last_at, bot_paused) VALUES (?, datetime('now','localtime'), 1)").run(tel);
+    const result = await waSend(payload);
+    if (result?.error) return res.status(502).json({ error: result.error.message || 'send failed' });
+    // Update last stored message to include mime (waSend records with null mime)
+    db.prepare("UPDATE messages SET media_mime = ? WHERE telefono = ? AND direction = 'out' AND media_id = ?").run(mime, tel, mediaId);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[WA] send-image error', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Media proxy: fetch from Meta CDN with auth
+const mediaUrlCache = new Map();
+app.get('/admin/media/:id', async (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).send('unauth');
+  const id = req.params.id;
+  if (!/^\d+$/.test(id)) return res.status(400).send('invalid id');
+  try {
+    let meta = mediaUrlCache.get(id);
+    const now = Date.now();
+    if (!meta || (now - meta.ts) > 4 * 60 * 1000) {
+      const r = await fetch(`https://graph.facebook.com/v21.0/${id}`, {
+        headers: { Authorization: `Bearer ${WA_TOKEN}` },
+      });
+      const j = await r.json();
+      if (!r.ok || !j.url) return res.status(502).send('meta meta error');
+      meta = { url: j.url, mime: j.mime_type, ts: now };
+      mediaUrlCache.set(id, meta);
+    }
+    const r2 = await fetch(meta.url, { headers: { Authorization: `Bearer ${WA_TOKEN}` } });
+    if (!r2.ok) return res.status(502).send('meta cdn error');
+    res.setHeader('Content-Type', meta.mime || r2.headers.get('content-type') || 'application/octet-stream');
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    const buf = Buffer.from(await r2.arrayBuffer());
+    res.end(buf);
+  } catch (e) {
+    console.error('[media proxy]', e);
+    res.status(500).send('error');
+  }
 });
 
 app.post('/admin/inbox/:tel/read', (req, res) => {
@@ -478,7 +632,12 @@ app.get('/admin/inbox', (req, res) => {
   .topbar .r a:last-child{margin-right:0}
   .layout{flex:1;display:flex;overflow:hidden}
   .sidebar{width:340px;background:#fff;border-right:1px solid #ddd6c4;display:flex;flex-direction:column;flex-shrink:0}
-  .sidebar h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:#8a6d2b;padding:16px 20px 8px;font-weight:500}
+  .sidebar h2{font-size:13px;text-transform:uppercase;letter-spacing:.1em;color:#8a6d2b;padding:16px 20px 8px;font-weight:500;display:flex;justify-content:space-between;align-items:center}
+  .sidebar h2 .link{text-decoration:none;color:#1a5cb0;font-size:11px;cursor:pointer}
+  .label-filter{padding:0 14px 10px;display:flex;flex-wrap:wrap;gap:6px}
+  .label-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:500;color:#fff;cursor:pointer;opacity:.55}
+  .label-chip.active{opacity:1}
+  .label-chip .x{opacity:.7}
   .conv-list{flex:1;overflow-y:auto}
   .conv{padding:14px 18px;border-bottom:1px solid #f0ead9;cursor:pointer;display:flex;gap:10px;align-items:flex-start;position:relative}
   .conv:hover{background:#faf7f0}
@@ -492,13 +651,30 @@ app.get('/admin/inbox', (req, res) => {
   .conv .badge{background:#8a6d2b;color:#fff;font-size:11px;padding:1px 7px;border-radius:999px;margin-left:6px;font-weight:500}
   .conv .bot-tag{font-size:10px;padding:1px 6px;border-radius:4px;background:#e8f0fe;color:#1a5cb0;margin-left:4px}
   .conv .bot-tag.off{background:#fef0e8;color:#c23b1e}
+  .conv .labels{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}
+  .conv .labels .mini{font-size:10px;padding:1px 6px;border-radius:999px;color:#fff;font-weight:500}
   .chat{flex:1;display:flex;flex-direction:column;background:#efe9da;min-width:0}
   .chat-empty{flex:1;display:flex;align-items:center;justify-content:center;color:#999;font-size:15px;padding:40px;text-align:center}
-  .chat-header{background:#fff;padding:14px 22px;border-bottom:1px solid #ddd6c4;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+  .chat-header{background:#fff;padding:12px 22px;border-bottom:1px solid #ddd6c4;flex-shrink:0}
+  .chat-header .row{display:flex;justify-content:space-between;align-items:center}
   .chat-header .info{display:flex;align-items:center;gap:12px}
   .chat-header .avatar{width:40px;height:40px;border-radius:50%;background:#e8dfc5;color:#8a6d2b;display:flex;align-items:center;justify-content:center;font-weight:600}
   .chat-header .name{font-weight:600;font-size:15px}
   .chat-header .tel{font-size:12px;color:#888}
+  .chat-labels{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+  .chat-labels .chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;color:#fff;font-size:11px;font-weight:500}
+  .chat-labels .chip .x{cursor:pointer;opacity:.7;font-size:13px;line-height:1}
+  .chat-labels .chip .x:hover{opacity:1}
+  .chat-labels .add-btn{border:1px dashed #ccc;padding:2px 9px;border-radius:999px;color:#666;font-size:11px;cursor:pointer;background:#fff;font-weight:500}
+  .chat-labels .add-btn:hover{border-color:#8a6d2b;color:#8a6d2b}
+  .label-menu{position:absolute;background:#fff;border:1px solid #ddd6c4;border-radius:10px;padding:8px;min-width:220px;box-shadow:0 6px 20px rgba(0,0,0,.12);z-index:100;display:none}
+  .label-menu.open{display:block}
+  .label-menu .item{padding:6px 8px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px}
+  .label-menu .item:hover{background:#f4f0e4}
+  .label-menu .dot{width:10px;height:10px;border-radius:50%}
+  .label-menu .divider{height:1px;background:#eee;margin:4px 0}
+  .label-menu .new{color:#1a5cb0;font-weight:500;font-size:13px;padding:6px 8px;cursor:pointer}
+  .label-menu .new:hover{background:#f4f0e4;border-radius:6px}
   .mode-toggle{display:flex;align-items:center;gap:8px;font-size:13px}
   .mode-toggle button{padding:6px 12px;border:1px solid #ddd6c4;background:#fff;color:#1c1c1c;border-radius:999px;cursor:pointer;font-size:12px;font-weight:500}
   .mode-toggle button.active{background:#1c1c1c;color:#f4f0e4;border-color:#1c1c1c}
@@ -507,15 +683,29 @@ app.get('/admin/inbox', (req, res) => {
   .msg .time{display:block;font-size:10px;color:#999;margin-top:4px;text-align:right}
   .msg.in{background:#fff;align-self:flex-start;border-bottom-left-radius:4px}
   .msg.out{background:#d9c28a;color:#1c1c1c;align-self:flex-end;border-bottom-right-radius:4px}
-  .msg .meta{font-size:10px;opacity:.6;margin-top:2px}
-  .composer{background:#fff;padding:14px 22px;border-top:1px solid #ddd6c4;display:flex;gap:10px;align-items:flex-end;flex-shrink:0}
+  .msg img{max-width:260px;max-height:260px;border-radius:10px;display:block;cursor:pointer}
+  .msg audio{max-width:260px}
+  .msg video{max-width:260px;max-height:260px;border-radius:10px}
+  .msg .doc{display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;padding:6px;border-radius:6px;background:rgba(0,0,0,.04)}
+  .composer{background:#fff;padding:10px 14px;border-top:1px solid #ddd6c4;display:flex;gap:8px;align-items:flex-end;flex-shrink:0}
   .composer textarea{flex:1;border:1px solid #ddd6c4;border-radius:18px;padding:10px 14px;font-size:14px;font-family:inherit;resize:none;outline:none;min-height:40px;max-height:120px}
   .composer textarea:focus{border-color:#8a6d2b}
-  .composer button{background:#1c1c1c;color:#f4f0e4;border:none;border-radius:999px;padding:10px 22px;font-size:14px;font-weight:500;cursor:pointer;height:40px}
+  .composer .icon-btn{background:#f4f0e4;border:none;color:#8a6d2b;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:20px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  .composer .icon-btn:hover{background:#e8dfc5}
+  .composer button.send{background:#1c1c1c;color:#f4f0e4;border:none;border-radius:999px;padding:0 22px;font-size:14px;font-weight:500;cursor:pointer;height:40px;flex-shrink:0}
   .composer button:disabled{opacity:.5;cursor:not-allowed}
+  .composer textarea:disabled{background:#f4f0e4}
   .banner{background:#fff3cd;color:#856404;padding:10px 22px;font-size:13px;border-bottom:1px solid #f0e6b6;text-align:center}
   .banner.err{background:#f8d7da;color:#721c24;border-color:#f5c6cb}
   .empty-list{padding:32px 20px;color:#999;text-align:center;font-size:14px}
+  .img-viewer{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:200;cursor:zoom-out}
+  .img-viewer.open{display:flex}
+  .img-viewer img{max-width:90vw;max-height:90vh;border-radius:10px}
+  .upload-preview{position:absolute;bottom:70px;left:22px;right:22px;background:#fff;border:1px solid #ddd6c4;border-radius:10px;padding:10px;display:none;gap:10px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+  .upload-preview.open{display:flex}
+  .upload-preview img{max-height:80px;border-radius:6px}
+  .upload-preview .info{flex:1;font-size:13px}
+  .upload-preview button{background:#c23b1e;color:#fff;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-size:12px}
 </style></head><body>
 <div class="topbar">
   <h1>COLUMEN</h1>
@@ -523,82 +713,196 @@ app.get('/admin/inbox', (req, res) => {
 </div>
 <div class="layout">
   <div class="sidebar">
-    <h2>Conversaciones <span id="totalUnread" style="color:#c23b1e"></span></h2>
+    <h2><span>Conversaciones <span id="totalUnread" style="color:#c23b1e"></span></span><span class="link" id="manageLabels">Gestionar etiquetas</span></h2>
+    <div class="label-filter" id="labelFilter"></div>
     <div class="conv-list" id="convList"><div class="empty-list">Cargando…</div></div>
   </div>
   <div class="chat" id="chat">
     <div class="chat-empty">Seleccioná una conversación</div>
   </div>
 </div>
+<div class="img-viewer" id="imgViewer"><img id="imgViewerImg" alt=""></div>
 <script>
 (function(){
-  let activeTel = null;
-  let convs = [];
-  let lastMsgId = 0;
-  let canSend = true;
+  const state = {
+    activeTel: null,
+    convs: [],
+    labels: [],
+    filterLabels: new Set(),
+    conv: null,
+    canSend: true,
+    lastId: 0,
+    shellTel: null
+  };
 
+  const $ = sel => document.querySelector(sel);
   function initials(s){ if(!s) return '?'; const p=s.trim().split(/\\s+/); return ((p[0]?.[0]||'')+(p[1]?.[0]||'')).toUpperCase() || '?'; }
   function formatTime(iso){ if(!iso) return ''; const d=new Date(iso.replace(' ','T')); const now=new Date(); const same=d.toDateString()===now.toDateString(); return same ? d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}) : d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'}); }
-  function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
   async function loadConvs(){
-    const r = await fetch('/admin/inbox/data', { credentials:'same-origin' });
-    if (!r.ok) return;
-    const { conversations, totalUnread } = await r.json();
-    convs = conversations;
-    document.getElementById('totalUnread').textContent = totalUnread ? '('+totalUnread+')' : '';
-    renderSidebar();
+    try {
+      const r = await fetch('/admin/inbox/data', { credentials:'same-origin' });
+      if (!r.ok) return;
+      const { conversations, totalUnread, labels } = await r.json();
+      state.convs = conversations;
+      state.labels = labels;
+      $('#totalUnread').textContent = totalUnread ? '('+totalUnread+')' : '';
+      renderLabelFilter();
+      renderSidebar();
+      if (state.activeTel) {
+        const cur = conversations.find(c => c.telefono === state.activeTel);
+        if (cur) {
+          state.conv = { ...(state.conv || {}), ...cur };
+          updateChatHeader();
+        }
+      }
+    } catch {}
+  }
+
+  function renderLabelFilter(){
+    const el = $('#labelFilter');
+    el.innerHTML = state.labels.map(l => {
+      const active = state.filterLabels.has(l.id) ? 'active' : '';
+      return '<span class="label-chip '+active+'" data-id="'+l.id+'" style="background:'+l.color+'">'+escapeHtml(l.name)+'</span>';
+    }).join('');
+    el.querySelectorAll('.label-chip').forEach(n => n.addEventListener('click', () => {
+      const id = parseInt(n.dataset.id,10);
+      if (state.filterLabels.has(id)) state.filterLabels.delete(id);
+      else state.filterLabels.add(id);
+      renderLabelFilter();
+      renderSidebar();
+    }));
   }
 
   function renderSidebar(){
-    const el = document.getElementById('convList');
-    if (!convs.length) { el.innerHTML = '<div class="empty-list">Sin mensajes aún</div>'; return; }
-    el.innerHTML = convs.map(c => {
+    const el = $('#convList');
+    let filtered = state.convs;
+    if (state.filterLabels.size) {
+      filtered = state.convs.filter(c => (c.labels||[]).some(l => state.filterLabels.has(l.id)));
+    }
+    if (!filtered.length) { el.innerHTML = '<div class="empty-list">'+(state.convs.length?'Ninguna con esos filtros':'Sin mensajes aún')+'</div>'; return; }
+    el.innerHTML = filtered.map(c => {
       const name = c.nombre || c.telefono;
       const botTag = c.bot_paused ? '<span class="bot-tag off">Humano</span>' : '<span class="bot-tag">Bot</span>';
       const unread = c.unread ? '<span class="badge">'+c.unread+'</span>' : '';
-      return '<div class="conv '+(c.telefono===activeTel?'active':'')+'" data-tel="'+c.telefono+'">'+
+      const labels = (c.labels||[]).map(l => '<span class="mini" style="background:'+l.color+'">'+escapeHtml(l.name)+'</span>').join('');
+      return '<div class="conv '+(c.telefono===state.activeTel?'active':'')+'" data-tel="'+c.telefono+'">'+
         '<div class="avatar">'+initials(name)+'</div>'+
         '<div class="body">'+
           '<div class="row1"><div class="name">'+escapeHtml(name)+botTag+'</div><div class="time">'+formatTime(c.last_at)+'</div></div>'+
           '<div class="preview">'+(c.last_direction==='out'?'<span style="color:#8a6d2b">Tú: </span>':'')+escapeHtml((c.last_body||'').slice(0,60))+unread+'</div>'+
+          (labels ? '<div class="labels">'+labels+'</div>' : '')+
         '</div></div>';
     }).join('');
     el.querySelectorAll('.conv').forEach(n => n.addEventListener('click', () => openConv(n.dataset.tel)));
   }
 
   async function openConv(tel){
-    activeTel = tel;
-    lastMsgId = 0;
+    state.activeTel = tel;
+    state.lastId = 0;
     document.querySelectorAll('.conv').forEach(n => n.classList.toggle('active', n.dataset.tel===tel));
-    await loadMessages(true);
-    await fetch('/admin/inbox/'+encodeURIComponent(tel)+'/read', { method:'POST', credentials:'same-origin' });
+    await fetchMessages(true);
+    try { await fetch('/admin/inbox/'+encodeURIComponent(tel)+'/read', { method:'POST', credentials:'same-origin' }); } catch {}
     loadConvs();
   }
 
-  async function loadMessages(scroll){
-    if (!activeTel) return;
-    const r = await fetch('/admin/inbox/'+encodeURIComponent(activeTel)+'/messages', { credentials:'same-origin' });
-    if (!r.ok) return;
-    const { messages, conversation, canSend: cs } = await r.json();
-    canSend = cs;
-    renderChat(messages, conversation);
-    if (scroll) requestAnimationFrame(()=>{ const m=document.getElementById('msgs'); if(m) m.scrollTop=m.scrollHeight; });
-    if (messages.length) lastMsgId = messages[messages.length-1].id;
+  async function fetchMessages(scroll){
+    if (!state.activeTel) return;
+    try {
+      const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/messages', { credentials:'same-origin' });
+      if (!r.ok) return;
+      const { messages, conversation, canSend } = await r.json();
+      state.conv = conversation;
+      state.canSend = canSend;
+      if (state.shellTel !== state.activeTel) {
+        renderShell();
+        state.shellTel = state.activeTel;
+        state.lastId = 0;
+      }
+      updateChatHeader();
+      applyMessages(messages, scroll);
+    } catch {}
   }
 
-  function renderChat(messages, conv){
-    const name = conv.nombre || conv.telefono;
-    const paused = !!conv.bot_paused;
-    const msgsHtml = messages.map(m => {
-      const cls = m.direction==='out' ? 'out' : 'in';
-      return '<div class="msg '+cls+'">'+escapeHtml(m.body)+'<span class="time">'+formatTime(m.created_at)+'</span></div>';
-    }).join('');
-    const warnBanner = !canSend ? '<div class="banner">Fuera de la ventana de 24 hs de WhatsApp. Esperá a que el cliente escriba primero.</div>' : '';
-    document.getElementById('chat').innerHTML =
-      '<div class="chat-header">'+
+  function applyMessages(messages, forceScroll){
+    const container = $('#msgs');
+    if (!container) return;
+    const newOnes = messages.filter(m => m.id > state.lastId);
+    if (!state.lastId && messages.length) {
+      container.innerHTML = messages.map(msgHtml).join('');
+      state.lastId = messages[messages.length-1].id;
+      forceScroll = true;
+    } else if (newOnes.length) {
+      const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      container.insertAdjacentHTML('beforeend', newOnes.map(msgHtml).join(''));
+      state.lastId = messages[messages.length-1].id;
+      if (nearBottom) forceScroll = true;
+    }
+    if (forceScroll) requestAnimationFrame(() => { container.scrollTop = container.scrollHeight; });
+  }
+
+  function msgHtml(m){
+    const cls = m.direction==='out' ? 'out' : 'in';
+    let inner = '';
+    if (m.type === 'image' && m.media_id) {
+      inner = '<img src="/admin/media/'+m.media_id+'" alt="imagen" loading="lazy" onclick="window.__showImg(this.src)">';
+      if (m.body && !m.body.startsWith('📷')) inner += '<div style="margin-top:4px">'+escapeHtml(m.body)+'</div>';
+    } else if (m.type === 'audio' && m.media_id) {
+      inner = '<audio controls src="/admin/media/'+m.media_id+'"></audio>';
+    } else if (m.type === 'video' && m.media_id) {
+      inner = '<video controls src="/admin/media/'+m.media_id+'"></video>';
+    } else if (m.type === 'document' && m.media_id) {
+      inner = '<a class="doc" href="/admin/media/'+m.media_id+'" target="_blank" download>📄 '+escapeHtml(m.body||'Documento')+'</a>';
+    } else {
+      inner = escapeHtml(m.body);
+    }
+    return '<div class="msg '+cls+'">'+inner+'<span class="time">'+formatTime(m.created_at)+'</span></div>';
+  }
+
+  window.__showImg = src => {
+    const v = $('#imgViewer');
+    $('#imgViewerImg').src = src;
+    v.classList.add('open');
+  };
+  $('#imgViewer').addEventListener('click', () => $('#imgViewer').classList.remove('open'));
+
+  function renderShell(){
+    $('#chat').innerHTML =
+      '<div class="chat-header" id="chatHeader"></div>'+
+      '<div id="chatBanner"></div>'+
+      '<div class="messages" id="msgs"></div>'+
+      '<div class="upload-preview" id="uploadPreview"></div>'+
+      '<div class="composer" id="composer">'+
+        '<input type="file" id="fileInp" accept="image/*,video/*,application/pdf" style="display:none">'+
+        '<button class="icon-btn" id="btnAttach" title="Adjuntar imagen o archivo">📎</button>'+
+        '<textarea id="inp" rows="1" placeholder="Escribí un mensaje…"></textarea>'+
+        '<button class="send" id="btnSend">Enviar</button>'+
+      '</div>';
+    const inp = $('#inp');
+    const btn = $('#btnSend');
+    btn.addEventListener('click', sendMsg);
+    inp.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); } });
+    inp.addEventListener('input', () => { inp.style.height='auto'; inp.style.height=Math.min(120, inp.scrollHeight)+'px'; });
+    $('#btnAttach').addEventListener('click', () => $('#fileInp').click());
+    $('#fileInp').addEventListener('change', handleFile);
+    inp.focus();
+  }
+
+  function updateChatHeader(){
+    const header = $('#chatHeader');
+    const banner = $('#chatBanner');
+    if (!header || !state.conv) return;
+    const c = state.conv;
+    const name = c.nombre || c.telefono;
+    const paused = !!c.bot_paused;
+    const labelChips = (c.labels||[]).map(l =>
+      '<span class="chip" style="background:'+l.color+'">'+escapeHtml(l.name)+' <span class="x" data-remove="'+l.id+'">×</span></span>'
+    ).join('');
+    header.innerHTML =
+      '<div class="row">'+
         '<div class="info"><div class="avatar">'+initials(name)+'</div>'+
-          '<div><div class="name">'+escapeHtml(name)+'</div><div class="tel">+'+escapeHtml(conv.telefono)+'</div></div>'+
+          '<div><div class="name">'+escapeHtml(name)+'</div><div class="tel">+'+escapeHtml(c.telefono)+'</div></div>'+
         '</div>'+
         '<div class="mode-toggle">'+
           '<span>Modo:</span>'+
@@ -606,41 +910,116 @@ app.get('/admin/inbox', (req, res) => {
           '<button id="btnHuman" class="'+(paused?'active':'')+'">Humano</button>'+
         '</div>'+
       '</div>'+
-      warnBanner+
-      '<div class="messages" id="msgs">'+msgsHtml+'</div>'+
-      '<div class="composer">'+
-        '<textarea id="inp" rows="1" placeholder="'+(canSend?'Escribí un mensaje…':'Solo lectura (ventana de 24 hs cerrada)')+'" '+(canSend?'':'disabled')+'></textarea>'+
-        '<button id="btnSend" '+(canSend?'':'disabled')+'>Enviar</button>'+
-      '</div>';
-    document.getElementById('btnBot').addEventListener('click', ()=>toggleBot(false));
-    document.getElementById('btnHuman').addEventListener('click', ()=>toggleBot(true));
-    const inp = document.getElementById('inp');
-    const btn = document.getElementById('btnSend');
-    btn.addEventListener('click', sendMsg);
-    inp.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); } });
-    inp.addEventListener('input', ()=>{ inp.style.height='auto'; inp.style.height=Math.min(120, inp.scrollHeight)+'px'; });
-    inp.focus();
+      '<div class="chat-labels" id="chatLabels">'+labelChips+'<button class="add-btn" id="btnAddLabel">+ Etiqueta</button></div>';
+    $('#btnBot').addEventListener('click', () => toggleBot(false));
+    $('#btnHuman').addEventListener('click', () => toggleBot(true));
+    header.querySelectorAll('.x[data-remove]').forEach(n => n.addEventListener('click', e => {
+      e.stopPropagation();
+      removeLabel(parseInt(n.dataset.remove,10));
+    }));
+    $('#btnAddLabel').addEventListener('click', openLabelMenu);
+
+    banner.innerHTML = !state.canSend
+      ? '<div class="banner">Fuera de la ventana de 24 hs. Esperá a que el cliente escriba primero (no tenés plantillas aprobadas).</div>'
+      : '';
+    const inp = $('#inp'); const btn = $('#btnSend'); const att = $('#btnAttach');
+    if (inp && btn && att) {
+      inp.disabled = !state.canSend;
+      btn.disabled = !state.canSend;
+      att.disabled = !state.canSend;
+      inp.placeholder = state.canSend ? 'Escribí un mensaje…' : 'Solo lectura (ventana cerrada)';
+    }
   }
 
   async function toggleBot(paused){
-    if (!activeTel) return;
-    await fetch('/admin/inbox/'+encodeURIComponent(activeTel)+'/bot', {
+    if (!state.activeTel) return;
+    await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/bot', {
       method:'POST', credentials:'same-origin',
       headers:{'Content-Type':'application/json'}, body: JSON.stringify({paused})
     });
-    await loadMessages(false);
+    fetchMessages(false);
     loadConvs();
   }
 
+  function openLabelMenu(e){
+    e?.stopPropagation();
+    closeLabelMenu();
+    const assigned = new Set((state.conv?.labels||[]).map(l => l.id));
+    const items = state.labels.map(l => {
+      if (assigned.has(l.id)) return '';
+      return '<div class="item" data-add="'+l.id+'"><span class="dot" style="background:'+l.color+'"></span>'+escapeHtml(l.name)+'</div>';
+    }).filter(Boolean).join('');
+    const menu = document.createElement('div');
+    menu.className = 'label-menu open';
+    menu.id = 'labelMenu';
+    menu.innerHTML = (items || '<div style="padding:6px 8px;color:#999;font-size:12px">Todas asignadas</div>') +
+      '<div class="divider"></div><div class="new" id="newLabel">+ Nueva etiqueta…</div>';
+    const rect = $('#btnAddLabel').getBoundingClientRect();
+    menu.style.left = rect.left + 'px';
+    menu.style.top = (rect.bottom + 4) + 'px';
+    document.body.appendChild(menu);
+    menu.querySelectorAll('.item[data-add]').forEach(n => n.addEventListener('click', () => addLabel(parseInt(n.dataset.add,10))));
+    menu.querySelector('#newLabel').addEventListener('click', createLabelPrompt);
+    setTimeout(() => document.addEventListener('click', closeLabelMenu, { once: true }), 0);
+  }
+
+  function closeLabelMenu(){ const m = document.getElementById('labelMenu'); if (m) m.remove(); }
+
+  async function addLabel(id){
+    closeLabelMenu();
+    const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/labels/'+id, { method:'POST', credentials:'same-origin' });
+    const j = await r.json();
+    if (state.conv) state.conv.labels = j.labels;
+    updateChatHeader();
+    loadConvs();
+  }
+
+  async function removeLabel(id){
+    const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/labels/'+id, { method:'DELETE', credentials:'same-origin' });
+    const j = await r.json();
+    if (state.conv) state.conv.labels = j.labels;
+    updateChatHeader();
+    loadConvs();
+  }
+
+  async function createLabelPrompt(){
+    closeLabelMenu();
+    const name = prompt('Nombre de la etiqueta:');
+    if (!name || !name.trim()) return;
+    const color = prompt('Color hex (ej: #1a5cb0):', '#8a6d2b') || '#8a6d2b';
+    const r = await fetch('/admin/labels', {
+      method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:name.trim(), color})
+    });
+    if (!r.ok) { alert('Error creando etiqueta'); return; }
+    const j = await r.json();
+    state.labels.push({ id:j.id, name:j.name, color:j.color });
+    await addLabel(j.id);
+  }
+
+  $('#manageLabels').addEventListener('click', async () => {
+    const list = state.labels.map(l => '• '+l.name+' ('+l.color+')').join('\\n') || '(sin etiquetas)';
+    const action = prompt('Etiquetas:\\n'+list+'\\n\\nOpciones:\\n1 = Crear nueva\\n2 = Eliminar por nombre\\n\\nIngresá 1 o 2:');
+    if (action === '1') return createLabelPrompt();
+    if (action === '2') {
+      const n = prompt('Nombre exacto de la etiqueta a eliminar:');
+      if (!n) return;
+      const lab = state.labels.find(l => l.name === n);
+      if (!lab) return alert('No existe');
+      if (!confirm('Eliminar "'+n+'"? (se quita de todas las conversaciones)')) return;
+      await fetch('/admin/labels/'+lab.id, { method:'DELETE', credentials:'same-origin' });
+      loadConvs();
+    }
+  });
+
   async function sendMsg(){
-    const inp = document.getElementById('inp');
-    const btn = document.getElementById('btnSend');
+    const inp = $('#inp');
+    const btn = $('#btnSend');
     const body = inp.value.trim();
-    if (!body || !activeTel) return;
+    if (!body || !state.activeTel || !state.canSend) return;
     btn.disabled = true;
-    inp.disabled = true;
     try {
-      const r = await fetch('/admin/inbox/'+encodeURIComponent(activeTel)+'/send', {
+      const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/send', {
         method:'POST', credentials:'same-origin',
         headers:{'Content-Type':'application/json'}, body: JSON.stringify({ body })
       });
@@ -650,18 +1029,52 @@ app.get('/admin/inbox', (req, res) => {
       } else {
         inp.value = '';
         inp.style.height='auto';
-        await loadMessages(true);
+        await fetchMessages(true);
         loadConvs();
       }
     } finally {
       btn.disabled = false;
-      inp.disabled = false;
       inp.focus();
     }
   }
 
+  async function handleFile(){
+    const file = $('#fileInp').files[0];
+    if (!file || !state.activeTel) return;
+    if (file.size > 14 * 1024 * 1024) { alert('Archivo muy grande (max 14 MB)'); $('#fileInp').value=''; return; }
+    const caption = prompt('Mensaje para enviar con el archivo (opcional):') || '';
+    const btn = $('#btnSend');
+    const att = $('#btnAttach');
+    btn.disabled = true; att.disabled = true;
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/send-image', {
+        method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ filename: file.name, mime: file.type, data: base64, caption })
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(()=>({}));
+        alert('Error enviando archivo: '+(j.detail||j.error||'desconocido'));
+      } else {
+        await fetchMessages(true);
+        loadConvs();
+      }
+    } catch (e) {
+      alert('Error: '+e.message);
+    } finally {
+      $('#fileInp').value = '';
+      btn.disabled = false; att.disabled = false;
+    }
+  }
+
   loadConvs();
-  setInterval(()=>{ loadConvs(); if (activeTel) loadMessages(false); }, 4000);
+  setInterval(() => { loadConvs(); if (state.activeTel) fetchMessages(false); }, 4000);
 })();
 </script>
 </body></html>`);
@@ -749,9 +1162,9 @@ function logDebug(event) {
   if (debugLog.length > 100) debugLog.shift();
 }
 
-function recordMessage(tel, direction, type, body, waId) {
+function recordMessage(tel, direction, type, body, waId, mediaId, mediaMime) {
   try {
-    db.prepare('INSERT INTO messages (wa_id, telefono, direction, type, body) VALUES (?,?,?,?,?)').run(waId || null, tel, direction, type || 'text', body || '');
+    db.prepare('INSERT INTO messages (wa_id, telefono, direction, type, body, media_id, media_mime) VALUES (?,?,?,?,?,?,?)').run(waId || null, tel, direction, type || 'text', body || '', mediaId || null, mediaMime || null);
     const existing = db.prepare('SELECT telefono, unread FROM conversations WHERE telefono = ?').get(tel);
     if (existing) {
       const unread = direction === 'in' ? existing.unread + 1 : existing.unread;
@@ -767,12 +1180,25 @@ function recordMessage(tel, direction, type, body, waId) {
 
 function outboundBodyFor(payload) {
   if (payload.type === 'text') return payload.text?.body || '';
+  if (payload.type === 'image') return payload.image?.caption || '📷 Foto';
+  if (payload.type === 'document') return payload.document?.caption || payload.document?.filename || '📄 Documento';
+  if (payload.type === 'video') return payload.video?.caption || '🎥 Video';
+  if (payload.type === 'audio') return '🎤 Audio';
   if (payload.type === 'interactive') {
     const main = payload.interactive?.body?.text || '';
     const btns = (payload.interactive?.action?.buttons || []).map(b => `[${b.reply?.title}]`).join(' ');
     return btns ? `${main}\n${btns}` : main;
   }
   return `[${payload.type}]`;
+}
+
+function outboundMediaFor(payload) {
+  const mediaTypes = ['image','audio','video','document','sticker'];
+  if (mediaTypes.includes(payload.type)) {
+    const m = payload[payload.type] || {};
+    return { mediaId: m.id || null, mediaMime: null };
+  }
+  return { mediaId: null, mediaMime: null };
 }
 
 async function waSend(payload) {
@@ -793,7 +1219,8 @@ async function waSend(payload) {
     } else {
       logDebug({ kind: 'send_ok', to: payload.to, type: payload.type });
       const waId = data?.messages?.[0]?.id;
-      recordMessage(payload.to, 'out', payload.type, outboundBodyFor(payload), waId);
+      const media = outboundMediaFor(payload);
+      recordMessage(payload.to, 'out', payload.type, outboundBodyFor(payload), waId, media.mediaId, media.mediaMime);
     }
     return data;
   } catch (err) {
@@ -959,6 +1386,17 @@ app.post('/webhook', async (req, res) => {
         return handleTextInFlow(from, body);
       }
       return sendWelcomeButtons(from);
+    }
+
+    if (['image','audio','video','document','sticker'].includes(msg.type)) {
+      const media = msg[msg.type] || {};
+      const caption = media.caption || '';
+      const label = msg.type==='image' ? '📷 Foto' : msg.type==='audio' ? '🎤 Audio' : msg.type==='video' ? '🎥 Video' : msg.type==='document' ? `📄 ${media.filename || 'Documento'}` : '⭐ Sticker';
+      const body = caption ? `${label}\n${caption}` : label;
+      recordMessage(from, 'in', msg.type, body, msg.id, media.id, media.mime_type);
+      const conv = db.prepare('SELECT bot_paused FROM conversations WHERE telefono = ?').get(from);
+      if (conv?.bot_paused) return;
+      return sendText(from, 'Gracias por tu mensaje. Para atenderte mejor, escribinos en texto así podemos tomar tus datos y un profesional te contacta a la brevedad.');
     }
 
     recordMessage(from, 'in', msg.type, `[${msg.type}]`, msg.id);
