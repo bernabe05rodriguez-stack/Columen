@@ -509,10 +509,10 @@ app.get('/admin', (req, res) => {
   }
   @media(max-width:560px){
     .stats{grid-template-columns:1fr 1fr;gap:8px}
-    .brand svg{height:36px}
-    .topbar{padding:8px 12px}
-    .nav{gap:2px}
-    .nav a:not(.active):not(.logout){display:none}
+    .brand svg{height:34px}
+    .topbar{padding:8px 10px;gap:6px;flex-wrap:wrap}
+    .nav{gap:2px;flex-wrap:wrap;justify-content:flex-end}
+    .nav a{padding:6px 9px;font-size:12px;letter-spacing:0}
     .nav .sep{display:none}
     .page-head h1{font-size:22px}
     .stat{padding:14px 16px}
@@ -694,10 +694,10 @@ app.get('/admin/backup', (req, res) => {
   .empty{color:var(--ink-55);font-size:14px;text-align:center;padding:32px 0;font-style:italic}
   @media(max-width:880px){main{padding:18px 14px 40px}.topbar{padding:10px 14px;gap:8px}.brand svg{height:40px}.nav a{padding:7px 10px;font-size:12.5px}.page-head h1{font-size:24px}.card{padding:22px 20px}}
   @media(max-width:640px){
-    .topbar{padding:8px 12px}
-    .brand svg{height:36px}
-    .nav{gap:2px}
-    .nav a:not(.active):not(.logout){display:none}
+    .topbar{padding:8px 10px;gap:6px;flex-wrap:wrap}
+    .brand svg{height:34px}
+    .nav{gap:2px;flex-wrap:wrap;justify-content:flex-end}
+    .nav a{padding:6px 9px;font-size:12px;letter-spacing:0}
     .nav .sep{display:none}
     .page-head h1{font-size:22px}
     .card{padding:18px}
@@ -1005,14 +1005,14 @@ app.get('/admin/inbox', (req, res) => {
   .topbar .brand{display:flex;align-items:center;gap:10px}
   .topbar .brand svg{height:42px;width:auto;display:block;max-width:100%}
   @media(max-width:768px){
-    .topbar{padding:8px 14px}
-    .topbar .brand svg{height:34px}
-    .topbar .r a{padding:6px 9px;font-size:12px}
+    .topbar{padding:8px 10px;gap:6px}
+    .topbar .brand svg{height:32px}
+    .topbar .r{flex-wrap:wrap;justify-content:flex-end}
+    .topbar .r a{padding:6px 8px;font-size:12px;letter-spacing:0}
     .topbar .r .sep{display:none}
-    .topbar .r a:not(.active):not(.logout){display:none}
   }
   @media(max-width:480px){
-    .topbar .brand svg{height:30px}
+    .topbar .brand svg{height:28px}
     .topbar .r a{padding:5px 7px;font-size:11.5px}
   }
   .topbar .r{display:flex;align-items:center;gap:4px}
@@ -1066,16 +1066,21 @@ app.get('/admin/inbox', (req, res) => {
   /* Chat panel */
   .chat{flex:1;display:flex;flex-direction:column;background:#EFEAE2;min-width:0;position:relative;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='320' height='320' viewBox='0 0 320 320'%3E%3Cg fill='%23D9D4CC' fill-opacity='0.35'%3E%3Ccircle cx='40' cy='40' r='1.5'/%3E%3Ccircle cx='120' cy='80' r='1'/%3E%3Ccircle cx='200' cy='30' r='1.2'/%3E%3Ccircle cx='280' cy='110' r='1'/%3E%3Ccircle cx='60' cy='180' r='1.1'/%3E%3Ccircle cx='160' cy='220' r='1.3'/%3E%3Ccircle cx='240' cy='260' r='1'/%3E%3Ccircle cx='90' cy='280' r='1.2'/%3E%3C/g%3E%3C/svg%3E")}
   .chat-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px;color:#667781;background:#F0F2F5;background-image:none;border-left:1px solid #E9EDEF}
-  .chat-empty .big{font-family:serif;font-size:32px;color:#41525D;margin-bottom:10px}
+  .chat-empty .icon-circle{width:80px;height:80px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;margin-bottom:18px;box-shadow:0 2px 8px rgba(0,0,0,.05)}
+  .chat-empty .icon-circle svg{width:42px;height:42px;color:#00A884}
+  .chat-empty .big{font-family:serif;font-size:28px;color:#41525D;margin-bottom:10px;font-weight:300}
   .chat-empty .sub{font-size:14px;max-width:500px;line-height:1.6}
 
-  .chat-header{background:#F0F2F5;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;border-left:1px solid #E9EDEF;cursor:pointer}
-  .chat-header .info{display:flex;align-items:center;gap:12px}
-  .chat-header .avatar{width:40px;height:40px;border-radius:50%;background:#DFE5E7;color:#54656F;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:15px}
-  .chat-header .name{font-weight:500;font-size:16px;color:#111B21}
-  .chat-header .sub{font-size:13px;color:#667781}
-  .chat-header .actions{display:flex;gap:4px}
-  .chat-header .ico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#54656F;background:transparent;border:none;font-size:18px}
+  .chat-header{background:#F0F2F5;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;border-left:1px solid #E9EDEF;gap:8px}
+  .chat-header .info{display:flex;align-items:center;gap:12px;cursor:pointer;flex:1;min-width:0}
+  .chat-header .info-text{flex:1;min-width:0}
+  .chat-header .avatar{width:40px;height:40px;border-radius:50%;background:#DFE5E7;color:#54656F;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:15px;flex-shrink:0}
+  .chat-header .name{font-weight:500;font-size:16px;color:#111B21;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chat-header .sub{font-size:13px;color:#667781;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .chat-header .back{width:36px;height:36px;border-radius:50%;display:none;align-items:center;justify-content:center;background:transparent;border:none;color:#54656F;cursor:pointer;font-size:22px;flex-shrink:0;padding:0}
+  .chat-header .back:hover{background:#E9EDEF}
+  .chat-header .actions{display:flex;gap:4px;flex-shrink:0}
+  .chat-header .ico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#54656F;background:transparent;border:none;font-size:18px;flex-shrink:0}
   .chat-header .ico:hover{background:#E9EDEF}
 
   .chat-sub{background:#FFF8DC;border-bottom:1px solid #F0E6B6;padding:8px 16px;font-size:13px;color:#8A6D00;display:flex;align-items:center;gap:8px;flex-shrink:0}
@@ -1087,33 +1092,57 @@ app.get('/admin/inbox', (req, res) => {
   .chat-labels-bar .add-btn{border:1px dashed #B0B7BC;padding:2px 10px;border-radius:999px;color:#54656F;font-size:11px;cursor:pointer;background:#fff;font-weight:500}
   .chat-labels-bar .add-btn:hover{border-color:#00A884;color:#00A884}
 
-  .messages{flex:1;overflow-y:auto;padding:14px 60px;display:flex;flex-direction:column;gap:2px;position:relative}
-  .date-sep{align-self:center;background:#E1F2FB;color:#54656F;font-size:12px;font-weight:500;padding:5px 12px;border-radius:8px;margin:10px 0;box-shadow:0 1px 1px rgba(0,0,0,.05)}
-  .msg{max-width:65%;padding:6px 8px 8px;border-radius:8px;font-size:14.2px;line-height:1.4;word-wrap:break-word;white-space:pre-wrap;color:#111B21;box-shadow:0 1px 0.5px rgba(0,0,0,.13);position:relative;margin-bottom:1px}
+  .messages{flex:1;overflow-y:auto;padding:14px 8% 14px;display:flex;flex-direction:column;gap:2px;position:relative}
+  .date-sep{align-self:center;background:#E1F2FB;color:#54656F;font-size:12.5px;font-weight:500;padding:5px 12px;border-radius:8px;margin:10px 0;box-shadow:0 1px 1px rgba(0,0,0,.05)}
+  .msg{max-width:65%;padding:6px 8px 8px;border-radius:8px;font-size:14.2px;line-height:1.4;word-wrap:break-word;overflow-wrap:break-word;white-space:pre-wrap;color:#111B21;box-shadow:0 1px 0.5px rgba(0,0,0,.13);position:relative;margin-bottom:1px;cursor:pointer}
   .msg .bubble-meta{display:inline-flex;align-items:center;gap:3px;float:right;margin-left:8px;margin-top:6px;font-size:11px;color:#667781;line-height:1}
   .msg .tick{font-size:14px;letter-spacing:-4px;color:#667781}
   .msg .tick.read{color:#53BDEB}
   .msg.in{background:#fff;align-self:flex-start;border-top-left-radius:0}
   .msg.out{background:#D9FDD3;align-self:flex-end;border-top-right-radius:0}
-  .msg.in+.msg.in,.msg.out+.msg.out{border-radius:8px}
-  .msg img{max-width:320px;max-height:320px;border-radius:6px;display:block;cursor:pointer;margin:-2px -2px 2px}
-  .msg audio{max-width:300px;display:block}
+  /* Bubble tails (cola del bocadillo, igual a WA) */
+  .msg.in:not(.cont)::before{content:'';position:absolute;top:0;left:-8px;width:8px;height:13px;background:#fff;clip-path:polygon(0 0,100% 0,100% 100%);box-shadow:0 1px 0.5px rgba(0,0,0,.06)}
+  .msg.out:not(.cont)::before{content:'';position:absolute;top:0;right:-8px;width:8px;height:13px;background:#D9FDD3;clip-path:polygon(0 0,100% 0,0 100%);box-shadow:0 1px 0.5px rgba(0,0,0,.06)}
+  .msg.cont{border-top-left-radius:8px;border-top-right-radius:8px}
+  .msg img{max-width:320px;max-height:320px;border-radius:6px;display:block;cursor:zoom-in;margin:-2px -2px 2px}
+  .msg audio{max-width:300px;display:block;height:42px}
   .msg video{max-width:320px;max-height:320px;border-radius:6px;display:block}
-  .msg .doc{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;background:rgba(0,0,0,.06);color:inherit;text-decoration:none;margin:-2px -2px 4px}
-  .msg .doc .ico{font-size:22px}
+  .msg .doc{display:flex;align-items:center;gap:10px;padding:12px;border-radius:8px;background:rgba(0,0,0,.04);color:inherit;text-decoration:none;margin:-2px -2px 4px;border:1px solid rgba(0,0,0,.06)}
+  .msg .doc:hover{background:rgba(0,0,0,.08)}
+  .msg .doc .ico{font-size:24px;flex-shrink:0;width:34px;height:34px;background:#fff;border-radius:6px;display:flex;align-items:center;justify-content:center}
+  .msg .doc .doc-name{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#111B21;font-weight:500}
+  .msg .doc .doc-sub{font-size:11.5px;color:#667781;margin-top:2px}
   .msg .caption{margin-top:4px}
+  /* Reply preview within bubble */
+  .msg .reply-snip{border-left:3px solid #06A98E;background:rgba(6,169,142,.08);padding:5px 8px;border-radius:4px;margin:-2px -2px 6px;font-size:13px;color:#54656F;cursor:pointer}
+  .msg.out .reply-snip{border-left-color:#06A98E;background:rgba(0,168,132,.07)}
+  .msg .reply-snip .who{font-size:12.5px;color:#06A98E;font-weight:500;margin-bottom:2px}
+  .msg .reply-snip .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#54656F}
+  /* Hover hint */
+  .msg:hover{filter:brightness(0.985)}
 
   .scroll-down{position:absolute;bottom:80px;right:30px;width:42px;height:42px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,.2);display:none;align-items:center;justify-content:center;cursor:pointer;color:#54656F;font-size:18px;border:none;z-index:10}
   .scroll-down.show{display:flex}
 
-  .composer{background:#F0F2F5;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-shrink:0;border-left:1px solid #E9EDEF;position:relative}
-  .composer .icon-btn{background:transparent;border:none;color:#54656F;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  /* Reply bar (above composer when replying) */
+  .reply-bar{background:#F0F2F5;padding:8px 14px;display:none;gap:10px;align-items:center;border-top:1px solid #E9EDEF;border-left:1px solid #E9EDEF;flex-shrink:0}
+  .reply-bar.open{display:flex}
+  .reply-bar .quote{flex:1;border-left:3px solid #06A98E;padding:4px 10px;background:rgba(6,169,142,.06);border-radius:4px;min-width:0}
+  .reply-bar .quote .who{font-size:12.5px;color:#06A98E;font-weight:500;margin-bottom:2px}
+  .reply-bar .quote .txt{font-size:13px;color:#54656F;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .reply-bar .close-reply{background:transparent;border:none;color:#54656F;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:16px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  .reply-bar .close-reply:hover{background:#E9EDEF}
+
+  .composer{background:#F0F2F5;padding:8px 12px;display:flex;gap:6px;align-items:flex-end;flex-shrink:0;border-left:1px solid #E9EDEF;position:relative}
+  .composer .icon-btn{background:transparent;border:none;color:#54656F;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .15s}
   .composer .icon-btn:hover{background:#E9EDEF}
-  .composer .text-wrap{flex:1;background:#fff;border-radius:8px;padding:6px 12px;display:flex;align-items:center}
-  .composer textarea{flex:1;border:none;outline:none;font-size:15px;font-family:inherit;resize:none;min-height:24px;max-height:120px;background:transparent;color:#111B21;padding:4px 0}
+  .composer .icon-btn:disabled{opacity:.4;cursor:not-allowed}
+  .composer .text-wrap{flex:1;background:#fff;border-radius:8px;padding:9px 12px;display:flex;align-items:center;min-height:42px}
+  .composer textarea{flex:1;border:none;outline:none;font-size:15px;font-family:inherit;resize:none;min-height:24px;max-height:140px;background:transparent;color:#111B21;padding:0;line-height:1.4}
   .composer textarea::placeholder{color:#667781}
-  .composer .send{background:transparent;border:none;color:#00A884;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:24px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
-  .composer .send:hover{background:#E9EDEF}
+  .composer .send-or-mic{background:transparent;border:none;color:#54656F;width:40px;height:40px;border-radius:50%;cursor:pointer;font-size:22px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:background .15s,color .15s,transform .15s}
+  .composer .send-or-mic.has-text{color:#00A884;font-size:24px;transform:rotate(0deg)}
+  .composer .send-or-mic:hover{background:#E9EDEF}
   .composer:has(textarea:disabled){opacity:.7}
 
   /* Emoji picker */
@@ -1165,12 +1194,52 @@ app.get('/admin/inbox', (req, res) => {
   .info-stat{font-size:14px;color:#54656F}
   .info-stat b{color:#111B21;font-weight:500}
 
+  /* Modal genérico (reemplaza prompt() del navegador) */
+  .modal-bg{position:fixed;inset:0;background:rgba(11,20,26,.55);display:none;align-items:center;justify-content:center;z-index:300;padding:20px}
+  .modal-bg.open{display:flex}
+  .modal{background:#fff;border-radius:8px;padding:24px;width:100%;max-width:420px;box-shadow:0 6px 28px rgba(0,0,0,.2)}
+  .modal h3{font-size:18px;margin-bottom:6px;color:#111B21;font-weight:500}
+  .modal p{font-size:13.5px;color:#667781;margin-bottom:14px;line-height:1.4}
+  .modal input,.modal select{width:100%;padding:10px 12px;border:1px solid #DFE5E7;border-radius:6px;font-size:15px;font-family:inherit;outline:none;margin-bottom:10px;color:#111B21;background:#fff}
+  .modal input:focus,.modal select:focus{border-color:#00A884;box-shadow:0 0 0 3px rgba(0,168,132,.12)}
+  .modal .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+  .modal .btn{padding:9px 18px;border:none;border-radius:6px;font-size:14px;cursor:pointer;font-family:inherit;font-weight:500;letter-spacing:.02em}
+  .modal .btn.secondary{background:transparent;color:#54656F}
+  .modal .btn.secondary:hover{background:#F0F2F5}
+  .modal .btn.primary{background:#00A884;color:#fff}
+  .modal .btn.primary:hover{background:#06916F}
+  .modal .err{color:#C23B1E;font-size:12.5px;margin-top:-4px;margin-bottom:10px;display:none}
+  .modal .err.show{display:block}
+
+  /* Toast */
+  .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#41525D;color:#fff;padding:10px 20px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:14px;z-index:400;opacity:0;transition:opacity .2s,bottom .2s;pointer-events:none}
+  .toast.show{opacity:1;bottom:40px}
+  .toast.error{background:#C23B1E}
+
   @media (max-width: 900px){
     .sidebar{width:100%}
     .chat{display:none}
     .info-panel{display:none}
     .layout.has-chat .sidebar{display:none}
     .layout.has-chat .chat{display:flex}
+    .layout.has-chat .topbar{display:none} /* WhatsApp-like fullscreen */
+    .chat-header .back{display:flex}
+    .chat-header{position:sticky;top:0;z-index:10}
+    .messages{padding:10px 8px 14px}
+    .msg{max-width:80%}
+    .composer{padding:6px 8px}
+    .info-panel{position:fixed;inset:0;width:100%;height:100%;z-index:50}
+    .info-panel.hidden{display:none !important}
+    .info-panel:not(.hidden){display:flex !important;flex-direction:column}
+    .scroll-down{right:14px;bottom:80px}
+    .emoji-picker{width:calc(100vw - 16px);max-width:340px}
+    .attach-menu{flex-direction:row}
+  }
+  @media (max-width: 480px){
+    .messages{padding:8px 6px 12px}
+    .msg{max-width:85%;font-size:14px}
+    .conv .name{font-size:16px}
+    .conv .preview{font-size:13.5px}
   }
 </style></head><body>
 <div class="topbar">
@@ -1213,6 +1282,9 @@ app.get('/admin/inbox', (req, res) => {
   </div>
   <div class="chat" id="chat">
     <div class="chat-empty" id="chatEmpty">
+      <div class="icon-circle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+      </div>
       <div class="big">WhatsApp Web · COLUMEN</div>
       <div class="sub">Seleccioná un contacto de la izquierda para empezar a chatear. Los mensajes se registran, respondés cuando quieras y el bot se pausa automáticamente al escribir.</div>
     </div>
@@ -1220,6 +1292,8 @@ app.get('/admin/inbox', (req, res) => {
   <div class="info-panel hidden" id="infoPanel"></div>
 </div>
 <div class="img-viewer" id="imgViewer"><img id="imgViewerImg" alt=""></div>
+<div class="modal-bg" id="modalBg"><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast"></div>
 
 <script>
 (function(){
@@ -1234,8 +1308,71 @@ app.get('/admin/inbox', (req, res) => {
     lastId: 0,
     shellTel: null,
     messagesCache: [],
-    infoOpen: false
+    infoOpen: false,
+    replyTo: null
   };
+
+  // --- Modal & toast helpers (WhatsApp-like, no native prompt) ---
+  function showModal(html, onMount){
+    const bg = document.getElementById('modalBg');
+    const m = document.getElementById('modal');
+    m.innerHTML = html;
+    bg.classList.add('open');
+    if (onMount) onMount(m);
+    return new Promise(resolve => {
+      bg._resolve = resolve;
+      bg.onclick = e => { if (e.target === bg) closeModal(null); };
+    });
+  }
+  function closeModal(value){
+    const bg = document.getElementById('modalBg');
+    bg.classList.remove('open');
+    if (bg._resolve){ const r = bg._resolve; bg._resolve = null; r(value); }
+  }
+  window._closeModal = closeModal;
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (document.getElementById('modalBg').classList.contains('open')) closeModal(null);
+      else if (state.replyTo) cancelReply();
+    }
+  });
+
+  function toast(msg, isError){
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isError ? ' error' : '');
+    clearTimeout(t._tid);
+    t._tid = setTimeout(() => t.className = 'toast' + (isError?' error':''), 2400);
+  }
+
+  async function promptModal(title, opts){
+    opts = opts || {};
+    const html =
+      '<h3>'+escapeHtml(title)+'</h3>'+
+      (opts.desc ? '<p>'+escapeHtml(opts.desc)+'</p>' : '')+
+      '<input id="modalInp" type="'+(opts.type||'text')+'" placeholder="'+escapeHtml(opts.placeholder||'')+'" value="'+escapeHtml(opts.value||'')+'">'+
+      '<div class="err" id="modalErr"></div>'+
+      '<div class="btns"><button class="btn secondary" onclick="_closeModal(null)">Cancelar</button><button class="btn primary" id="modalOk">'+escapeHtml(opts.okLabel||'Aceptar')+'</button></div>';
+    return showModal(html, m => {
+      const inp = m.querySelector('#modalInp');
+      inp.focus();
+      const submit = () => {
+        const v = inp.value.trim();
+        if (opts.required && !v) { m.querySelector('#modalErr').textContent='Requerido'; m.querySelector('#modalErr').classList.add('show'); return; }
+        if (opts.validate) { const err = opts.validate(v); if (err){ m.querySelector('#modalErr').textContent=err; m.querySelector('#modalErr').classList.add('show'); return; } }
+        closeModal(v);
+      };
+      m.querySelector('#modalOk').onclick = submit;
+      inp.addEventListener('keydown', e => { if (e.key==='Enter'){ e.preventDefault(); submit(); }});
+    });
+  }
+  async function confirmModal(title, desc){
+    const html =
+      '<h3>'+escapeHtml(title)+'</h3>'+
+      (desc ? '<p>'+escapeHtml(desc)+'</p>' : '')+
+      '<div class="btns"><button class="btn secondary" onclick="_closeModal(false)">Cancelar</button><button class="btn primary" id="modalOk">Confirmar</button></div>';
+    return showModal(html, m => { m.querySelector('#modalOk').onclick = () => closeModal(true); });
+  }
 
   const $ = sel => document.querySelector(sel);
   function initials(s){ if(!s) return '?'; const p=s.trim().split(/\\s+/); return ((p[0]?.[0]||'')+(p[1]?.[0]||'')).toUpperCase() || '?'; }
@@ -1410,38 +1547,46 @@ app.get('/admin/inbox', (req, res) => {
   function renderMessagesWithDates(messages){
     let out = '';
     let lastDay = null;
+    let lastDir = null;
     for (const m of messages) {
       const d = parseDate(m.created_at);
+      let isCont = false;
       if (d && (!lastDay || !sameDay(d,lastDay))) {
         out += '<div class="date-sep">'+formatDayLabel(d)+'</div>';
         lastDay = d;
+        lastDir = null;
+      } else if (lastDir === m.direction) {
+        isCont = true;
       }
-      out += msgHtml(m);
+      out += msgHtml(m, isCont);
+      lastDir = m.direction;
     }
     return out;
   }
 
-  function msgHtml(m){
-    const cls = m.direction==='out' ? 'out' : 'in';
+  function msgHtml(m, isCont){
+    const cls = (m.direction==='out' ? 'out' : 'in') + (isCont ? ' cont' : '');
     let inner = '';
     if (m.type === 'image' && m.media_id) {
-      inner = '<img src="/admin/media/'+m.media_id+'" alt="imagen" loading="lazy" onclick="window.__showImg(this.src)">';
+      inner = '<img src="/admin/media/'+m.media_id+'" alt="imagen" loading="lazy" onclick="event.stopPropagation();window.__showImg(this.src)">';
       const caption = m.body && !m.body.startsWith('📷') ? m.body : '';
       if (caption) inner += '<div class="caption">'+escapeHtml(caption)+'</div>';
     } else if (m.type === 'audio' && m.media_id) {
-      inner = '<audio controls src="/admin/media/'+m.media_id+'"></audio>';
+      inner = '<audio controls src="/admin/media/'+m.media_id+'" onclick="event.stopPropagation()"></audio>';
     } else if (m.type === 'video' && m.media_id) {
-      inner = '<video controls src="/admin/media/'+m.media_id+'"></video>';
+      inner = '<video controls src="/admin/media/'+m.media_id+'" onclick="event.stopPropagation()"></video>';
     } else if (m.type === 'document' && m.media_id) {
       const name = (m.body||'').replace(/^📄\\s*/,'') || 'Documento';
-      inner = '<a class="doc" href="/admin/media/'+m.media_id+'" target="_blank" download><span class="ico">📄</span><span>'+escapeHtml(name)+'</span></a>';
+      const ext = (name.split('.').pop()||'').toUpperCase().slice(0,5);
+      inner = '<a class="doc" href="/admin/media/'+m.media_id+'" target="_blank" download onclick="event.stopPropagation()"><span class="ico">📄</span><div style="flex:1;min-width:0"><div class="doc-name">'+escapeHtml(name)+'</div><div class="doc-sub">'+escapeHtml(ext||'Archivo')+' · descargar</div></div></a>';
     } else {
       inner = escapeHtml(m.body);
     }
     const meta = m.direction === 'out'
       ? '<span class="bubble-meta">'+formatTime(m.created_at)+tickFor(m.status)+'</span>'
       : '<span class="bubble-meta">'+formatTime(m.created_at)+'</span>';
-    return '<div class="msg '+cls+'" data-mid="'+m.id+'">'+inner+meta+'</div>';
+    const preview = (m.body || '').slice(0, 80);
+    return '<div class="msg '+cls+'" data-mid="'+m.id+'" data-dir="'+m.direction+'" data-preview="'+escapeHtml(preview)+'">'+inner+meta+'</div>';
   }
 
   window.__showImg = src => {
@@ -1466,17 +1611,25 @@ app.get('/admin/inbox', (req, res) => {
         '<button class="video" id="attVid" title="Video">🎬</button>'+
         '<button class="doc" id="attDoc" title="Documento">📄</button>'+
       '</div>'+
+      '<div class="reply-bar" id="replyBar"></div>'+
       '<div class="composer" id="composer">'+
         '<button class="icon-btn" id="btnEmoji" title="Emoji">😊</button>'+
         '<button class="icon-btn" id="btnAttach" title="Adjuntar">📎</button>'+
         '<div class="text-wrap"><textarea id="inp" rows="1" placeholder="Escribí un mensaje"></textarea></div>'+
-        '<button class="send" id="btnSend" title="Enviar">➤</button>'+
+        '<button class="send-or-mic" id="btnSend" title="Mensaje de voz" aria-label="Enviar">🎤</button>'+
       '</div>';
     const inp = $('#inp');
     const btn = $('#btnSend');
     btn.addEventListener('click', sendMsg);
     inp.addEventListener('keydown', e => { if (e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMsg(); } });
-    inp.addEventListener('input', () => { inp.style.height='auto'; inp.style.height=Math.min(120, inp.scrollHeight)+'px'; });
+    inp.addEventListener('input', () => {
+      inp.style.height='auto';
+      inp.style.height=Math.min(140, inp.scrollHeight)+'px';
+      const has = inp.value.trim().length > 0;
+      btn.classList.toggle('has-text', has);
+      btn.textContent = has ? '➤' : '🎤';
+      btn.title = has ? 'Enviar' : 'Mensaje de voz (no disponible)';
+    });
     $('#btnAttach').addEventListener('click', toggleAttach);
     $('#btnEmoji').addEventListener('click', toggleEmoji);
     $('#attImg').addEventListener('click', () => { $('#fileInpImg').click(); closeMenus(); });
@@ -1485,7 +1638,35 @@ app.get('/admin/inbox', (req, res) => {
     ['fileInpImg','fileInpVid','fileInpDoc'].forEach(id => $('#'+id).addEventListener('change', () => handleFile($('#'+id).files[0], id)));
     $('#scrollDown').addEventListener('click', () => { $('#msgs').scrollTop = $('#msgs').scrollHeight; });
     $('#msgs').addEventListener('scroll', updateScrollDown);
+    // Reply on bubble click (texts only) — long press on mobile, click on desktop
+    $('#msgs').addEventListener('click', e => {
+      const bubble = e.target.closest('.msg');
+      if (!bubble) return;
+      // Skip if clicked on media/links/audio (let them work)
+      if (e.target.closest('img,audio,video,a,button')) return;
+      const text = bubble.dataset.preview || '';
+      if (!text) return;
+      // Toggle copy/reply menu inline (simple: just trigger reply)
+      startReply(bubble.dataset.dir === 'out' ? 'Tú' : (state.conv?.nombre || 'Cliente'), text);
+    });
     inp.focus();
+  }
+
+  function startReply(who, text){
+    state.replyTo = { who, text };
+    const bar = $('#replyBar');
+    if (!bar) return;
+    bar.innerHTML =
+      '<div class="quote"><div class="who">'+escapeHtml(who)+'</div><div class="txt">'+escapeHtml(text)+'</div></div>'+
+      '<button class="close-reply" id="closeReply" title="Cancelar">✕</button>';
+    bar.classList.add('open');
+    $('#closeReply').onclick = cancelReply;
+    $('#inp')?.focus();
+  }
+  function cancelReply(){
+    state.replyTo = null;
+    const bar = $('#replyBar');
+    if (bar){ bar.classList.remove('open'); bar.innerHTML=''; }
   }
 
   function updateScrollDown(){
@@ -1504,15 +1685,21 @@ app.get('/admin/inbox', (req, res) => {
     const c = state.conv;
     const name = c.nombre || c.telefono;
     const paused = !!c.bot_paused;
+    // "Última vez" — usamos last_at de la conversación si vino del cliente
+    const lastSeen = c.last_direction === 'in' && c.last_at
+      ? 'visto ' + formatListTime(c.last_at)
+      : (paused ? 'Modo humano' : 'Bot activo');
     header.innerHTML =
+      '<button class="back" id="btnBack" title="Volver" aria-label="Volver">←</button>'+
       '<div class="info" id="openInfo">'+
         '<div class="avatar">'+initials(name)+'</div>'+
-        '<div><div class="name">'+escapeHtml(name)+'</div><div class="sub">+'+escapeHtml(c.telefono)+' · '+(paused?'Modo humano':'Bot activo')+'</div></div>'+
+        '<div class="info-text"><div class="name">'+escapeHtml(name)+'</div><div class="sub">+'+escapeHtml(c.telefono)+' · '+escapeHtml(lastSeen)+'</div></div>'+
       '</div>'+
       '<div class="actions">'+
         '<button class="ico" id="btnToggleBot" title="'+(paused?'Reactivar bot':'Pausar bot y tomar control')+'">'+(paused?'🤖':'👤')+'</button>'+
         '<button class="ico" id="btnInfoToggle" title="Datos del contacto">ℹ️</button>'+
       '</div>';
+    $('#btnBack').addEventListener('click', closeChat);
     $('#openInfo').addEventListener('click', openInfo);
     $('#btnToggleBot').addEventListener('click', () => toggleBot(!paused));
     $('#btnInfoToggle').addEventListener('click', openInfo);
@@ -1643,41 +1830,61 @@ app.get('/admin/inbox', (req, res) => {
 
   async function createLabelPrompt(){
     closeLabelMenu();
-    const name = prompt('Nombre de la etiqueta:');
-    if (!name || !name.trim()) return;
-    const color = prompt('Color hex (ej: #00A884):', '#00A884') || '#00A884';
+    const name = await promptModal('Nueva etiqueta', { placeholder:'Ej: VIP', required:true, okLabel:'Continuar' });
+    if (!name) return;
+    const color = await promptModal('Color (hex)', { placeholder:'#00A884', value:'#00A884', okLabel:'Crear', validate: v => /^#[0-9a-fA-F]{6}$/.test(v) ? null : 'Formato hex inválido' });
+    if (!color) return;
     const r = await fetch('/admin/labels', {
       method:'POST', credentials:'same-origin',
       headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:name.trim(), color})
     });
-    if (!r.ok) { alert('Error creando etiqueta'); return; }
+    if (!r.ok) { toast('Error creando etiqueta', true); return; }
     const j = await r.json();
     state.labels.push({ id:j.id, name:j.name, color:j.color });
     if (state.activeTel) await addLabel(j.id);
     else loadConvs();
+    toast('Etiqueta "'+j.name+'" creada');
   }
 
   async function manageLabels(){
-    const list = state.labels.map(l => '• '+l.name+' ('+l.color+')').join('\\n') || '(sin etiquetas)';
-    const action = prompt('Etiquetas:\\n'+list+'\\n\\nOpciones:\\n1 = Crear nueva\\n2 = Eliminar por nombre\\n\\nIngresá 1 o 2:');
-    if (action === '1') return createLabelPrompt();
-    if (action === '2') {
-      const n = prompt('Nombre exacto de la etiqueta a eliminar:');
-      if (!n) return;
-      const lab = state.labels.find(l => l.name === n);
-      if (!lab) return alert('No existe');
-      if (!confirm('Eliminar "'+n+'"? (se quita de todas las conversaciones)')) return;
-      await fetch('/admin/labels/'+lab.id, { method:'DELETE', credentials:'same-origin' });
-      loadConvs();
-    }
+    // Construir un modal con la lista actual y opciones
+    const items = state.labels.map(l =>
+      '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F0F2F5">'+
+        '<span style="width:14px;height:14px;border-radius:50%;background:'+l.color+';flex-shrink:0"></span>'+
+        '<span style="flex:1;color:#111B21">'+escapeHtml(l.name)+'</span>'+
+        '<button class="btn secondary" data-del="'+l.id+'" data-name="'+escapeHtml(l.name)+'" style="padding:4px 10px;font-size:12px;color:#C23B1E">Eliminar</button>'+
+      '</div>'
+    ).join('') || '<p style="color:#667781">Sin etiquetas creadas todavía.</p>';
+    showModal(
+      '<h3>Gestionar etiquetas</h3>'+
+      '<div style="max-height:300px;overflow-y:auto;margin-bottom:14px">'+items+'</div>'+
+      '<div class="btns"><button class="btn secondary" onclick="_closeModal(null)">Cerrar</button><button class="btn primary" id="newLab">+ Nueva</button></div>',
+      m => {
+        m.querySelector('#newLab').onclick = () => { closeModal(null); createLabelPrompt(); };
+        m.querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => {
+          const id = b.dataset.del;
+          const nm = b.dataset.name;
+          closeModal(null);
+          if (!await confirmModal('Eliminar etiqueta', '"'+nm+'" se quitará de todas las conversaciones.')) return;
+          await fetch('/admin/labels/'+id, { method:'DELETE', credentials:'same-origin' });
+          toast('Etiqueta "'+nm+'" eliminada');
+          loadConvs();
+        });
+      }
+    );
   }
   $('#manageLabels').addEventListener('click', manageLabels);
 
   async function sendMsg(){
     const inp = $('#inp');
     const btn = $('#btnSend');
-    const body = inp.value.trim();
+    let body = inp.value.trim();
     if (!body || !state.activeTel || !state.canSend) return;
+    // If replying, prepend a quote (text-only client-side; WA doesn't render real reply via API but it's clear)
+    if (state.replyTo){
+      const q = (state.replyTo.text || '').slice(0, 120);
+      body = '> ' + state.replyTo.who + ': ' + q + '\\n\\n' + body;
+    }
     btn.disabled = true;
     try {
       const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/send', {
@@ -1686,10 +1893,13 @@ app.get('/admin/inbox', (req, res) => {
       });
       if (!r.ok) {
         const j = await r.json().catch(()=>({}));
-        alert('Error enviando: '+(j.detail||j.error||'desconocido'));
+        toast('Error enviando: '+(j.detail||j.error||'desconocido'), true);
       } else {
         inp.value = '';
         inp.style.height='auto';
+        cancelReply();
+        btn.classList.remove('has-text');
+        btn.textContent = '🎤';
         await fetchMessages(true);
         loadConvs();
       }
@@ -1698,11 +1908,26 @@ app.get('/admin/inbox', (req, res) => {
       inp.focus();
     }
   }
+  function closeChat(){
+    state.activeTel = null;
+    state.shellTel = null;
+    state.conv = null;
+    state.lastId = 0;
+    cancelReply();
+    $('#layout').classList.remove('has-chat');
+    $('#chat').innerHTML = '<div class="chat-empty"><div class="icon-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></div><div class="big">WhatsApp Web · COLUMEN</div><div class="sub">Seleccioná un contacto.</div></div>';
+    document.querySelectorAll('.conv').forEach(n => n.classList.remove('active'));
+  }
 
   async function handleFile(file, inputId){
     if (!file || !state.activeTel) return;
-    if (file.size > 14 * 1024 * 1024) { alert('Archivo muy grande (max 14 MB)'); return; }
-    const caption = prompt('Mensaje para enviar con el archivo (opcional):') || '';
+    if (file.size > 14 * 1024 * 1024) { toast('Archivo muy grande (máx 14 MB)', true); if (inputId) $('#'+inputId).value=''; return; }
+    const caption = await promptModal('Enviar archivo', {
+      desc: file.name + ' (' + (file.size/1024).toFixed(0) + ' KB)',
+      placeholder: 'Caption opcional…',
+      okLabel: 'Enviar'
+    });
+    if (caption === null) { if (inputId) $('#'+inputId).value=''; return; }
     const btn = $('#btnSend');
     const att = $('#btnAttach');
     btn.disabled = true; att.disabled = true;
@@ -1720,13 +1945,14 @@ app.get('/admin/inbox', (req, res) => {
       });
       if (!r.ok) {
         const j = await r.json().catch(()=>({}));
-        alert('Error enviando archivo: '+(j.detail||j.error||'desconocido'));
+        toast('Error: '+(j.detail||j.error||'desconocido'), true);
       } else {
         await fetchMessages(true);
         loadConvs();
+        toast('Archivo enviado');
       }
     } catch (e) {
-      alert('Error: '+e.message);
+      toast('Error: '+e.message, true);
     } finally {
       if (inputId) $('#'+inputId).value = '';
       btn.disabled = false; att.disabled = false;
@@ -1767,9 +1993,15 @@ app.get('/admin/inbox', (req, res) => {
   }
 
   $('#searchInp').addEventListener('input', e => { state.search = e.target.value; renderSidebar(); });
-  $('#btnNewChat').addEventListener('click', () => {
-    const tel = prompt('Número del contacto (solo dígitos, ej: 5492617571910):');
-    if (!tel || !/^\\d{10,15}$/.test(tel.trim())) return alert('Número inválido');
+  $('#btnNewChat').addEventListener('click', async () => {
+    const tel = await promptModal('Nuevo chat', {
+      desc: 'Ingresá el número con código país (ej: 5492617571910).',
+      placeholder: '5492617XXXXXXX',
+      required: true,
+      okLabel: 'Abrir chat',
+      validate: v => /^\\d{10,15}$/.test(v.trim()) ? null : 'Solo dígitos, 10-15 caracteres'
+    });
+    if (!tel) return;
     openConv(tel.trim());
   });
 
