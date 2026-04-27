@@ -3,17 +3,27 @@ const Database = require('better-sqlite3');
 const cookieParser = require('cookie-parser');
 const crypto = require('crypto');
 const path = require('path');
+const bcrypt = require('bcryptjs');
+const rateLimit = require('express-rate-limit');
 
 const app = express();
 const PORT = process.env.PORT || 80;
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const IS_PROD = NODE_ENV === 'production';
 const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || 'columen2026';
+const ADMIN_PASS = process.env.ADMIN_PASS || '';
+const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH || '';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 
 const WA_TOKEN = process.env.WHATSAPP_TOKEN || '';
 const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID || '';
 const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'columen-verify-2026';
+const APP_SECRET = process.env.APP_SECRET || '';
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://redhawk-columen.bm6z1s.easypanel.host';
+
+if (!APP_SECRET) console.error('[WA] APP_SECRET not set — webhook signature verification will FAIL');
+if (!ADMIN_PASS_HASH && !ADMIN_PASS) console.error('[auth] No ADMIN_PASS_HASH or ADMIN_PASS configured — login disabled');
+if (!ADMIN_PASS_HASH && ADMIN_PASS) console.warn('[auth] Using plaintext ADMIN_PASS fallback — set ADMIN_PASS_HASH (bcrypt) and remove ADMIN_PASS ASAP');
 
 // Database - use /data if exists (Docker volume), fallback to ./data
 const fs = require('fs');
@@ -180,7 +190,13 @@ runMigration('add_labels_2026_04', () => {
 // Cleanup old sessions (older than 24h)
 db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
 
-app.use(express.json());
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, res, buf) => {
+    // Only the Meta webhook needs raw body for HMAC verification
+    if (req.originalUrl === '/webhook') req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -197,6 +213,43 @@ function isAuthenticated(req) {
   const row = db.prepare("SELECT token FROM sessions WHERE token = ? AND created_at > datetime('now', '-1 day')").get(token);
   return !!row;
 }
+
+// --- Meta webhook signature verification (X-Hub-Signature-256) ---
+function verifyMetaSignature(req, res, next) {
+  if (!APP_SECRET) {
+    console.error('[WA] webhook rejected: APP_SECRET not configured');
+    return res.status(500).send('server misconfigured');
+  }
+  const sig = req.headers['x-hub-signature-256'];
+  if (!sig || !sig.startsWith('sha256=')) {
+    return res.status(401).send('missing signature');
+  }
+  const provided = sig.slice(7);
+  const raw = req.rawBody || Buffer.from('');
+  const expected = crypto.createHmac('sha256', APP_SECRET).update(raw).digest('hex');
+  let ok = false;
+  try {
+    const a = Buffer.from(expected, 'hex');
+    const b = Buffer.from(provided, 'hex');
+    ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch {
+    ok = false;
+  }
+  if (!ok) {
+    console.warn('[WA] webhook rejected: invalid signature');
+    return res.status(401).send('invalid signature');
+  }
+  next();
+}
+
+// --- Login rate limiter (anti brute-force) ---
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_LOGIN_MAX || '5', 10),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Demasiados intentos. Probá de nuevo en 15 minutos.',
+});
 
 // --- Webhook: receives data from Kapso ---
 app.post('/api/webhook', (req, res) => {
@@ -279,11 +332,27 @@ app.get('/admin/login', (req, res) => {
 </div></body></html>`);
 });
 
-app.post('/admin/login', (req, res) => {
-  const { username, password } = req.body;
-  if (username === ADMIN_USER && password === ADMIN_PASS) {
+app.post('/admin/login', loginLimiter, (req, res) => {
+  const { username, password } = req.body || {};
+  let ok = false;
+  if (username === ADMIN_USER && typeof password === 'string') {
+    if (ADMIN_PASS_HASH) {
+      try { ok = bcrypt.compareSync(password, ADMIN_PASS_HASH); } catch { ok = false; }
+    } else if (ADMIN_PASS) {
+      // Plaintext fallback (one-deploy compat). Logged so we know to remove it.
+      ok = password === ADMIN_PASS;
+      if (ok) console.warn('[auth] login via plaintext ADMIN_PASS — migrate to ADMIN_PASS_HASH');
+    }
+  }
+  if (ok) {
     const token = createSession();
-    res.cookie('session', token, { httpOnly: true, maxAge: 86400000, sameSite: 'lax' });
+    res.cookie('session', token, {
+      httpOnly: true,
+      maxAge: 86400000,
+      sameSite: 'strict',
+      secure: IS_PROD,
+      path: '/',
+    });
     return res.redirect('/admin');
   }
   res.redirect('/admin/login?error=1');
@@ -1717,6 +1786,7 @@ app.get('/consulta', (req, res) => {
   const area = req.query.area || '';
   const tel = req.query.tel || '';
   const sent = req.query.sent === '1';
+  const errMsg = req.query.err === 'consent' ? '<div class="err">Para continuar tenés que aceptar la política de privacidad.</div>' : '';
   res.send(`<!DOCTYPE html>
 <html lang="es"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -1735,6 +1805,10 @@ app.get('/consulta', (req, res) => {
   input,textarea{width:100%;padding:12px;border:1px solid #ddd6c4;border-radius:10px;font-size:15px;margin-bottom:14px;outline:none;font-family:inherit}
   input:focus,textarea:focus{border-color:#8a6d2b;box-shadow:0 0 0 3px rgba(138,109,43,.1)}
   textarea{resize:vertical;min-height:90px}
+  .consent-row{display:flex;align-items:flex-start;gap:10px;margin:6px 0 16px;padding:10px 12px;background:#fbf7e8;border-radius:10px;font-size:12.5px;color:#5a4a1a;line-height:1.45}
+  .consent-row input[type=checkbox]{width:auto;margin:3px 0 0;flex-shrink:0}
+  .consent-row label{margin:0;font-weight:400;color:#5a4a1a;font-size:12.5px}
+  .consent-row a{color:#8a6d2b;text-decoration:underline}
   button{width:100%;padding:14px;background:#1c1c1c;color:#f4f0e4;border:none;border-radius:999px;font-size:15px;font-weight:500;cursor:pointer;margin-top:4px}
   button:hover{background:#2a2a2a}
   button:disabled{opacity:.5;cursor:not-allowed}
@@ -1742,6 +1816,7 @@ app.get('/consulta', (req, res) => {
   .success .check{font-size:48px;margin-bottom:16px}
   .success h2{margin-bottom:12px}
   .success p{color:#666;font-size:15px;line-height:1.5}
+  .err{background:#fee;border:1px solid #fcc;color:#900;padding:10px 12px;border-radius:8px;font-size:13px;margin-bottom:14px}
 </style></head><body>
 <div class="card">
   ${sent ? `
@@ -1755,6 +1830,7 @@ app.get('/consulta', (req, res) => {
   ${area ? '<div class="area-badge"><span>Consulta ' + escapeHtml(area) + '</span></div>' : ''}
   <h2>Completa tus datos</h2>
   <div class="sub">Te contactaremos a la brevedad</div>
+  ${errMsg}
   <form method="POST" action="/consulta" id="formConsulta">
     <input type="hidden" name="area" value="${escapeHtml(area)}">
     <input type="hidden" name="telefono" value="${escapeHtml(tel)}">
@@ -1766,6 +1842,10 @@ app.get('/consulta', (req, res) => {
     <input type="email" name="email" required autocomplete="email">
     <label>Tu consulta *</label>
     <textarea name="consulta" required placeholder="Describe brevemente tu consulta..."></textarea>
+    <div class="consent-row">
+      <input type="checkbox" name="consent" id="consent" value="1" required>
+      <label for="consent">He leído y acepto la <a href="/legales/privacidad" target="_blank" rel="noopener">política de privacidad</a> y el <a href="/legales/aviso-legal" target="_blank" rel="noopener">aviso legal</a> del estudio.</label>
+    </div>
     <button type="submit" id="btnEnviar">Enviar consulta</button>
   </form>
   <script>
@@ -1778,7 +1858,11 @@ app.get('/consulta', (req, res) => {
 });
 
 app.post('/consulta', (req, res) => {
-  const { telefono, area, nombre, dni, email, consulta } = req.body;
+  const { telefono, area, nombre, dni, email, consulta, consent } = req.body || {};
+  if (!consent) {
+    const qs = new URLSearchParams({ area: area || '', tel: telefono || '', err: 'consent' });
+    return res.redirect(`/consulta?${qs.toString()}`);
+  }
   db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?, ?, ?, ?, ?, ?)').run(
     telefono || '', area || '', nombre || '', dni || '', email || '', consulta || ''
   );
@@ -1870,7 +1954,7 @@ function sendWelcomeButtons(to) {
     type: 'interactive',
     interactive: {
       type: 'button',
-      body: { text: 'Hola! Bienvenido a *COLUMEN* - Estudio Legal & Notarial.\n\nPara orientarte mejor, seleccioná el área de tu consulta:' },
+      body: { text: 'Hola! Bienvenido a *COLUMEN* - Estudio Legal & Notarial.\n\nPara orientarte mejor, seleccioná el área de tu consulta:\n\n_Al continuar aceptás nuestra política de privacidad: columen.ar/legales/privacidad_' },
       action: {
         buttons: [
           { type: 'reply', reply: { id: 'area_juridico', title: 'Jurídico' } },
@@ -1980,7 +2064,8 @@ app.get('/webhook', (req, res) => {
 });
 
 // Webhook receiver (POST) - mensajes entrantes de WhatsApp
-app.post('/webhook', async (req, res) => {
+// HMAC signature verification (X-Hub-Signature-256) is enforced before parsing
+app.post('/webhook', verifyMetaSignature, async (req, res) => {
   res.sendStatus(200);
   try {
     const entry = req.body.entry?.[0];
@@ -2044,6 +2129,14 @@ app.post('/webhook', async (req, res) => {
   } catch (err) {
     console.error('[WA] webhook handler error', err);
   }
+});
+
+// --- Páginas legales con URLs limpias (sin .html) ---
+app.get('/legales/privacidad', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'legales', 'privacidad.html'));
+});
+app.get('/legales/aviso-legal', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'legales', 'aviso-legal.html'));
 });
 
 // --- Serve landing page ---
