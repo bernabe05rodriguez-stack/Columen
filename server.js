@@ -172,34 +172,55 @@ app.post('/api/webhook', (req, res) => {
 // --- Admin login page ---
 app.get('/admin/login', (req, res) => {
   if (isAuthenticated(req)) return res.redirect('/admin');
-  const error = req.query.error ? '<p style="color:#e74c3c;margin-bottom:16px">Usuario o contraseña incorrectos</p>' : '';
+  const error = req.query.error ? '<div class="err">Usuario o contraseña incorrectos</div>' : '';
   res.send(`<!DOCTYPE html>
 <html lang="es"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin - COLUMEN</title>
+<title>Admin · COLUMEN</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  :root{--navy:#1a2744;--navy-2:#233050;--cream:#f4f0e4;--cream-2:#ece6d5;--cream-border:#d8d0bc;--gold:#8a6d2b;--gold-soft:#b8974a;--ink:#1c1c1c;--accent:#6aacd6}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter',system-ui,sans-serif;background:#f4f0e4;min-height:100vh;display:flex;align-items:center;justify-content:center}
-  .card{background:#fff;border-radius:16px;padding:40px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
-  h1{font-family:serif;font-size:24px;color:#1c1c1c;margin-bottom:8px;text-align:center}
-  .sub{color:#8a6d2b;font-size:13px;text-align:center;margin-bottom:28px;letter-spacing:.1em;text-transform:uppercase}
-  label{display:block;font-size:13px;font-weight:500;color:#555;margin-bottom:6px}
-  input{width:100%;padding:12px;border:1px solid #ddd6c4;border-radius:8px;font-size:15px;margin-bottom:16px;outline:none}
-  input:focus{border-color:#8a6d2b}
-  button{width:100%;padding:14px;background:#1c1c1c;color:#f4f0e4;border:none;border-radius:999px;font-size:15px;font-weight:500;cursor:pointer}
-  button:hover{background:#2a2a2a}
+  body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--navy);position:relative;overflow:hidden}
+  body::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 900px 700px at 80% 10%,rgba(184,151,74,.18),transparent 60%),radial-gradient(ellipse 700px 600px at 0% 100%,rgba(106,172,214,.12),transparent 65%);pointer-events:none}
+  body::after{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");opacity:.06;mix-blend-mode:soft-light;pointer-events:none}
+  .card{background:#fff;border-radius:18px;padding:44px 40px 36px;width:100%;max-width:400px;box-shadow:0 30px 80px -20px rgba(0,0,0,.5),0 8px 24px -8px rgba(0,0,0,.25);position:relative;z-index:1;border:1px solid rgba(255,255,255,.08)}
+  .logo{display:flex;justify-content:center;margin-bottom:18px}
+  .logo svg{width:140px;height:auto}
+  .sub{color:var(--gold);font-size:11.5px;text-align:center;margin-bottom:28px;letter-spacing:.18em;text-transform:uppercase;font-weight:500}
+  .err{background:#fdf0ee;border:1px solid #f5d6cf;color:#a3372a;padding:11px 14px;border-radius:10px;font-size:13.5px;margin-bottom:18px;text-align:center}
+  label{display:block;font-size:11.5px;font-weight:600;color:var(--gold);margin-bottom:7px;letter-spacing:.08em;text-transform:uppercase}
+  input{width:100%;padding:12px 14px;border:1.5px solid var(--cream-border);border-radius:10px;font-size:15px;margin-bottom:16px;outline:none;font-family:inherit;color:var(--ink);background:#fcfaf3;transition:border-color .2s,box-shadow .2s,background .2s}
+  input:focus{border-color:var(--gold-soft);background:#fff;box-shadow:0 0 0 4px rgba(184,151,74,.12)}
+  button{width:100%;padding:14px;background:var(--navy);color:var(--cream);border:none;border-radius:10px;font-size:15px;font-weight:500;cursor:pointer;font-family:inherit;letter-spacing:.02em;transition:background .2s,box-shadow .2s,transform .1s;margin-top:6px}
+  button:hover{background:var(--navy-2);box-shadow:0 8px 20px -6px rgba(26,39,68,.4)}
+  button:active{transform:scale(.98)}
+  .foot{margin-top:22px;text-align:center;font-size:12px;color:rgba(28,28,28,.45)}
 </style></head><body>
 <div class="card">
-  <h1>COLUMEN</h1>
-  <div class="sub">Panel de Administracion</div>
+  <div class="logo">
+    <svg viewBox="0 0 690 170" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="62" cy="84" r="43" fill="none" stroke="#1a2744" stroke-width="2"/>
+      <path d="M 92.3 68.6 A 34 34 0 1 0 92.3 99.4" fill="none" stroke="#6aacd6" stroke-width="5.5" stroke-linecap="round"/>
+      <circle cx="92.3" cy="68.6" r="4.6" fill="#6aacd6"/>
+      <circle cx="92.3" cy="99.4" r="4.6" fill="#6aacd6"/>
+      <line x1="124" y1="42" x2="124" y2="128" stroke="#1a2744" stroke-width="1.2" opacity="0.35"/>
+      <text x="140" y="98" font-family="'Lora',Georgia,serif" font-size="56" font-weight="700" letter-spacing="5" fill="#1a2744">COLUMEN</text>
+      <text x="142" y="126" font-family="'Inter',sans-serif" font-size="14.5" font-weight="600" letter-spacing="5" fill="#1a2744">LEGAL &amp; NOTARIAL</text>
+    </svg>
+  </div>
+  <div class="sub">Panel de Administración</div>
   ${error}
   <form method="POST" action="/admin/login">
     <label>Usuario</label>
-    <input type="text" name="username" required autofocus>
+    <input type="text" name="username" required autofocus autocomplete="username">
     <label>Contraseña</label>
-    <input type="password" name="password" required>
+    <input type="password" name="password" required autocomplete="current-password">
     <button type="submit">Ingresar</button>
   </form>
+  <div class="foot">© ${new Date().getFullYear()} Columen Legal &amp; Notarial</div>
 </div></body></html>`);
 });
 
@@ -256,85 +277,182 @@ app.get('/admin', (req, res) => {
   const total = consultas.length;
   const filtered = total !== totalAll;
 
-  const rows = consultas.map(c => `
+  const rows = consultas.map(c => {
+    const isJ = c.area?.toLowerCase().includes('juridic');
+    return `
     <tr>
-      <td>${c.id}</td>
-      <td>${escapeHtml(c.created_at || '')}</td>
-      <td>${escapeHtml(c.telefono)}</td>
-      <td><span class="badge ${c.area?.toLowerCase().includes('juridic') ? 'badge-j' : 'badge-n'}">${escapeHtml(c.area)}</span></td>
-      <td>${escapeHtml(c.nombre)}</td>
-      <td>${escapeHtml(c.dni)}</td>
-      <td>${escapeHtml(c.email)}</td>
-      <td class="consulta-cell">${escapeHtml(c.consulta)}</td>
-    </tr>`).join('');
+      <td class="muted">#${c.id}</td>
+      <td class="nowrap muted">${escapeHtml(c.created_at || '')}</td>
+      <td class="nowrap"><a class="tel" href="/admin/inbox?tel=${encodeURIComponent(c.telefono)}" title="Abrir chat">${escapeHtml(c.telefono)}</a></td>
+      <td><span class="badge ${isJ ? 'badge-j' : 'badge-n'}"><span class="dot"></span>${escapeHtml(c.area)}</span></td>
+      <td class="strong">${escapeHtml(c.nombre)}</td>
+      <td class="muted">${escapeHtml(c.dni)}</td>
+      <td class="muted">${escapeHtml(c.email)}</td>
+      <td class="consulta-cell" title="${escapeHtml(c.consulta)}">${escapeHtml(c.consulta)}</td>
+    </tr>`;
+  }).join('');
 
   res.send(`<!DOCTYPE html>
 <html lang="es"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin - COLUMEN</title>
+<title>Consultas · COLUMEN Admin</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  :root{--navy:#1a2744;--navy-2:#233050;--cream:#f4f0e4;--cream-2:#ece6d5;--cream-border:#d8d0bc;--gold:#8a6d2b;--gold-soft:#b8974a;--ink:#1c1c1c;--ink-55:rgba(28,28,28,.58);--ink-25:rgba(28,28,28,.25);--accent:#6aacd6;--card-border:#e8e2cf;--surface:#fffdf6}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter',system-ui,sans-serif;background:#f4f0e4;color:#1c1c1c;min-height:100vh}
-  .topbar{background:#1c1c1c;color:#f4f0e4;padding:16px 28px;display:flex;justify-content:space-between;align-items:center}
-  .topbar h1{font-family:serif;font-size:20px;font-weight:400;letter-spacing:.15em}
-  .topbar a{color:#b8974a;font-size:13px;text-decoration:none}
-  .topbar a:hover{color:#f4f0e4}
-  .stats{display:flex;gap:16px;padding:24px 28px;flex-wrap:wrap}
-  .stat{background:#fff;border:1px solid #ddd6c4;border-radius:12px;padding:20px 24px;flex:1;min-width:140px}
-  .stat .num{font-size:32px;font-weight:600;color:#1c1c1c}
-  .stat .label{font-size:12px;color:#8a6d2b;text-transform:uppercase;letter-spacing:.1em;margin-top:4px}
-  .table-wrap{padding:0 28px 40px;overflow-x:auto}
-  table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.06)}
-  th{background:#1c1c1c;color:#f4f0e4;padding:12px 14px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;text-align:left;font-weight:500}
-  td{padding:10px 14px;border-bottom:1px solid #eee8d9;font-size:14px}
-  tr:hover td{background:#faf7f0}
-  .badge{padding:3px 10px;border-radius:999px;font-size:12px;font-weight:500}
-  .badge-j{background:#e8f0fe;color:#1a5cb0}
-  .badge-n{background:#fef3e0;color:#8a6d2b}
-  .consulta-cell{max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .empty{text-align:center;padding:60px;color:#999;font-size:16px}
-  .filters{padding:0 28px 16px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
-  .filters .f{display:flex;flex-direction:column;gap:4px}
-  .filters label{font-size:11px;color:#8a6d2b;text-transform:uppercase;letter-spacing:.08em;font-weight:500}
-  .filters input,.filters select{padding:8px 12px;border:1px solid #ddd6c4;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;outline:none;min-width:140px}
-  .filters input:focus,.filters select:focus{border-color:#8a6d2b}
-  .filters .btn{padding:9px 18px;background:#1c1c1c;color:#f4f0e4;border:none;border-radius:999px;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
-  .filters .btn:hover{background:#2a2a2a}
-  .filters .btn.ghost{background:transparent;color:#1c1c1c;border:1px solid #ddd6c4}
-  .filters .btn.ghost:hover{background:#f4f0e4}
-  .filter-info{padding:0 28px 8px;font-size:13px;color:#8a6d2b}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100dvh;font-size:14px}
+  .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4)}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  .brand svg{height:34px;width:auto;display:block}
+  .nav{display:flex;align-items:center;gap:6px}
+  .nav a{color:rgba(244,240,228,.62);font-size:13px;text-decoration:none;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em}
+  .nav a:hover{color:var(--cream);background:rgba(255,255,255,.06)}
+  .nav a.active{color:var(--cream);background:rgba(184,151,74,.18);box-shadow:inset 0 -2px 0 var(--gold-soft)}
+  .nav .sep{width:1px;height:18px;background:rgba(255,255,255,.1);margin:0 6px}
+  .nav .logout{color:rgba(244,240,228,.5)}
+  .nav .logout:hover{color:#f4d6d6;background:rgba(195,80,80,.12)}
+  main{max-width:1400px;margin:0 auto;padding:28px 28px 60px}
+  .page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;flex-wrap:wrap;gap:16px}
+  .page-head h1{font-family:'Lora',Georgia,serif;font-size:32px;font-weight:600;color:var(--navy);letter-spacing:-.01em;line-height:1.1}
+  .page-head .lead{color:var(--ink-55);font-size:14px;margin-top:6px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px}
+  .stat{background:var(--surface);border:1px solid var(--card-border);border-radius:14px;padding:22px 24px;position:relative;overflow:hidden;transition:transform .35s cubic-bezier(.2,.8,.2,1),box-shadow .3s,border-color .25s}
+  .stat::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--gold-soft);opacity:.55;border-radius:14px 14px 0 0}
+  .stat.s-j::after{background:var(--accent)}
+  .stat.s-n::after{background:var(--gold)}
+  .stat:hover{transform:translateY(-2px);box-shadow:0 14px 30px -10px rgba(26,39,68,.16);border-color:#dcd5c0}
+  .stat .num{font-family:'Lora',serif;font-size:36px;font-weight:700;color:var(--navy);letter-spacing:-.02em;line-height:1}
+  .stat .label{font-size:11.5px;color:var(--gold);text-transform:uppercase;letter-spacing:.12em;margin-top:8px;font-weight:600}
+  .stat .ico{position:absolute;top:18px;right:18px;width:30px;height:30px;color:var(--gold-soft);opacity:.45}
+  .stat .ico svg{width:100%;height:100%}
+  .panel{background:var(--surface);border:1px solid var(--card-border);border-radius:14px;overflow:hidden;box-shadow:0 6px 24px -10px rgba(26,39,68,.1)}
+  .filters{padding:18px 22px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid var(--card-border);background:linear-gradient(180deg,#fffefa,var(--surface))}
+  .f{display:flex;flex-direction:column;gap:6px;flex:0 0 auto}
+  .f.grow{flex:1 1 240px;min-width:200px}
+  .f label{font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+  .f input,.f select{padding:10px 12px;border:1.5px solid var(--cream-border);border-radius:9px;font-size:13.5px;font-family:inherit;background:#fff;outline:none;color:var(--ink);transition:border-color .15s,box-shadow .15s}
+  .f input::placeholder{color:rgba(28,28,28,.35)}
+  .f input:focus,.f select:focus{border-color:var(--gold-soft);box-shadow:0 0 0 4px rgba(184,151,74,.13)}
+  .f-actions{display:flex;gap:8px;align-items:center;align-self:flex-end}
+  .btn{padding:10px 18px;background:var(--navy);color:var(--cream);border:none;border-radius:9px;font-size:13px;font-weight:500;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:7px;font-family:inherit;transition:background .2s,box-shadow .2s,transform .1s}
+  .btn:hover{background:var(--navy-2);box-shadow:0 6px 16px -6px rgba(26,39,68,.4)}
+  .btn:active{transform:scale(.97)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--cream-border)}
+  .btn.ghost:hover{background:var(--cream-2);border-color:var(--cream-border);box-shadow:none}
+  .filter-info{padding:10px 22px;font-size:12.5px;color:var(--gold);background:rgba(184,151,74,.06);border-bottom:1px solid var(--card-border);display:flex;align-items:center;gap:8px}
+  .filter-info::before{content:'•';color:var(--gold-soft);font-size:18px;line-height:1}
+  .table-wrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse}
+  thead th{background:var(--navy);color:rgba(244,240,228,.92);padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;text-align:left;font-weight:600;white-space:nowrap;position:sticky;top:62px;z-index:5}
+  thead th:first-child{padding-left:22px}
+  thead th:last-child{padding-right:22px}
+  tbody td{padding:13px 14px;border-bottom:1px solid #eee8d9;font-size:13.5px;vertical-align:top}
+  tbody td:first-child{padding-left:22px}
+  tbody td:last-child{padding-right:22px}
+  tbody tr{transition:background .15s}
+  tbody tr:hover td{background:#faf6ea}
+  tbody tr:last-child td{border-bottom:none}
+  td.muted{color:var(--ink-55);font-size:13px}
+  td.nowrap{white-space:nowrap}
+  td.strong{font-weight:600;color:var(--navy)}
+  td .tel{color:var(--navy);text-decoration:none;font-weight:500;border-bottom:1px dashed rgba(26,39,68,.25);transition:color .15s,border-color .15s}
+  td .tel:hover{color:var(--gold);border-bottom-color:var(--gold-soft)}
+  .badge{padding:4px 10px 4px 8px;border-radius:999px;font-size:11.5px;font-weight:600;letter-spacing:.02em;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .badge .dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+  .badge-j{background:rgba(106,172,214,.16);color:#1a5384}
+  .badge-j .dot{background:#3892ce}
+  .badge-n{background:rgba(184,151,74,.16);color:var(--gold)}
+  .badge-n .dot{background:var(--gold-soft)}
+  .consulta-cell{max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink);font-size:13px}
+  .empty{text-align:center;padding:80px 24px;color:var(--ink-55);font-size:15px;background:var(--surface)}
+  .empty .ico{width:48px;height:48px;color:var(--gold-soft);opacity:.4;margin:0 auto 14px}
+  .empty .ico svg{width:100%;height:100%}
+  .empty strong{display:block;color:var(--ink);font-size:16px;margin-bottom:4px;font-weight:600}
+  @media(max-width:880px){
+    .stats{grid-template-columns:1fr 1fr;gap:10px}
+    main{padding:18px 16px 40px}
+    .topbar{padding:12px 16px}
+    .nav a{padding:7px 10px;font-size:12.5px}
+    .page-head h1{font-size:24px}
+    .filters{padding:14px}
+    .f.grow{flex-basis:100%}
+    thead th{position:static}
+  }
+  @media(max-width:560px){.stats{grid-template-columns:1fr}.brand svg{height:30px}.nav a:not(.logout){display:none}.nav a.active{display:inline-flex}}
 </style></head><body>
 <div class="topbar">
-  <h1>COLUMEN</h1>
-  <div><a href="/admin" style="margin-right:18px">Consultas</a><a href="/admin/inbox" style="margin-right:18px">WhatsApp</a><a href="/admin/backup" style="margin-right:18px">Backup</a><a href="/admin/logout">Salir</a></div>
+  <a href="/admin" class="brand" aria-label="Columen Admin">
+    <svg viewBox="0 0 690 170" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="62" cy="84" r="43" fill="none" stroke="#ffffff" stroke-width="2.2"/>
+      <path d="M 92.3 68.6 A 34 34 0 1 0 92.3 99.4" fill="none" stroke="#6aacd6" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="92.3" cy="68.6" r="5" fill="#6aacd6"/>
+      <circle cx="92.3" cy="99.4" r="5" fill="#6aacd6"/>
+      <line x1="124" y1="42" x2="124" y2="128" stroke="#ffffff" stroke-width="1.4" opacity="0.5"/>
+      <text x="140" y="98" font-family="'Lora',Georgia,serif" font-size="56" font-weight="700" letter-spacing="5" fill="#ffffff">COLUMEN</text>
+      <text x="142" y="126" font-family="'Inter',sans-serif" font-size="14.5" font-weight="600" letter-spacing="5" fill="#ffffff">LEGAL &amp; NOTARIAL</text>
+    </svg>
+  </a>
+  <nav class="nav">
+    <a href="/admin" class="active">Consultas</a>
+    <a href="/admin/inbox">WhatsApp</a>
+    <a href="/admin/backup">Backup</a>
+    <span class="sep"></span>
+    <a href="/admin/logout" class="logout">Salir</a>
+  </nav>
 </div>
-<div class="stats">
-  <div class="stat"><div class="num">${totalAll}</div><div class="label">Total consultas</div></div>
-  <div class="stat"><div class="num">${totalJuridico}</div><div class="label">Juridico</div></div>
-  <div class="stat"><div class="num">${totalNotarial}</div><div class="label">Notarial</div></div>
-</div>
-<form class="filters" method="get" action="/admin">
-  <div class="f"><label>Buscar</label><input type="text" name="q" value="${escapeHtml(f.q)}" placeholder="Nombre, DNI, email, tel, texto..."></div>
-  <div class="f"><label>Area</label>
-    <select name="area">
-      <option value="">Todas</option>
-      <option value="juridico" ${f.area === 'juridico' ? 'selected' : ''}>Juridico</option>
-      <option value="notarial" ${f.area === 'notarial' ? 'selected' : ''}>Notarial</option>
-    </select>
+<main>
+  <div class="page-head">
+    <div>
+      <h1>Consultas</h1>
+      <div class="lead">Lead capturados por el bot de WhatsApp y el formulario web.</div>
+    </div>
   </div>
-  <div class="f"><label>Desde</label><input type="date" name="desde" value="${escapeHtml(f.desde)}"></div>
-  <div class="f"><label>Hasta</label><input type="date" name="hasta" value="${escapeHtml(f.hasta)}"></div>
-  <button type="submit" class="btn">Filtrar</button>
-  ${filtered ? '<a href="/admin" class="btn ghost">Limpiar</a>' : ''}
-</form>
-${filtered ? `<div class="filter-info">Mostrando ${total} de ${totalAll} consultas</div>` : ''}
-<div class="table-wrap">
-  ${total === 0 ? `<div class="empty">${filtered ? 'No hay resultados con esos filtros' : 'No hay consultas aun'}</div>` : `
-  <table>
-    <thead><tr><th>#</th><th>Fecha</th><th>Telefono</th><th>Area</th><th>Nombre</th><th>DNI</th><th>Email</th><th>Consulta</th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`}
-</div>
+  <div class="stats">
+    <div class="stat">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18"/></svg></div>
+      <div class="num">${totalAll}</div>
+      <div class="label">Total consultas</div>
+    </div>
+    <div class="stat s-j">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M5 7l7-4 7 4"/><path d="M5 7l-2 8h4l-2-8zM19 7l-2 8h4l-2-8z"/><line x1="2" y1="21" x2="22" y2="21"/></svg></div>
+      <div class="num">${totalJuridico}</div>
+      <div class="label">Jurídico</div>
+    </div>
+    <div class="stat s-n">
+      <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21h14M7 21v-2a2 2 0 012-2h6a2 2 0 012 2v2M12 13V7M8 13h8a2 2 0 012 2H6a2 2 0 012-2z"/><circle cx="12" cy="5" r="2"/></svg></div>
+      <div class="num">${totalNotarial}</div>
+      <div class="label">Notarial</div>
+    </div>
+  </div>
+  <div class="panel">
+    <form class="filters" method="get" action="/admin">
+      <div class="f grow"><label>Buscar</label><input type="text" name="q" value="${escapeHtml(f.q)}" placeholder="Nombre, DNI, email, teléfono o texto…"></div>
+      <div class="f"><label>Área</label>
+        <select name="area">
+          <option value="">Todas</option>
+          <option value="juridico" ${f.area === 'juridico' ? 'selected' : ''}>Jurídico</option>
+          <option value="notarial" ${f.area === 'notarial' ? 'selected' : ''}>Notarial</option>
+        </select>
+      </div>
+      <div class="f"><label>Desde</label><input type="date" name="desde" value="${escapeHtml(f.desde)}"></div>
+      <div class="f"><label>Hasta</label><input type="date" name="hasta" value="${escapeHtml(f.hasta)}"></div>
+      <div class="f-actions">
+        <button type="submit" class="btn">Filtrar</button>
+        ${filtered ? '<a href="/admin" class="btn ghost">Limpiar</a>' : ''}
+      </div>
+    </form>
+    ${filtered ? `<div class="filter-info">Mostrando ${total} de ${totalAll} consultas</div>` : ''}
+    <div class="table-wrap">
+      ${total === 0 ? `<div class="empty"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg></div><strong>${filtered ? 'Sin resultados' : 'Aún no hay consultas'}</strong>${filtered ? 'Probá con otros filtros o limpiá la búsqueda' : 'Cuando lleguen, las verás aquí en tiempo real'}</div>` : `
+      <table>
+        <thead><tr><th>#</th><th>Fecha</th><th>Teléfono</th><th>Área</th><th>Nombre</th><th>DNI</th><th>Email</th><th>Consulta</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`}
+    </div>
+  </div>
+</main>
 <script>
 (function(){
   const baseline = ${totalAll};
@@ -360,44 +478,107 @@ app.get('/admin/backup', (req, res) => {
   const liveSize = fs.existsSync(DB_PATH) ? (fs.statSync(DB_PATH).size / 1024).toFixed(1) : '?';
   const list = files.map(f => {
     const size = (fs.statSync(path.join(BACKUP_DIR, f)).size / 1024).toFixed(1);
-    return `<tr><td><code>${escapeHtml(f)}</code></td><td>${size} KB</td><td><a href="/admin/backup/download?file=${encodeURIComponent(f)}">Descargar</a></td></tr>`;
+    const m = f.match(/columen-(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})-?(.*)\.db/);
+    const pretty = m ? `${m[1]} ${m[2].replace(/-/g,':')}${m[3] ? ` · <span class="reason">${escapeHtml(m[3])}</span>` : ''}` : escapeHtml(f);
+    return `<tr><td><div class="when">${pretty}</div><code class="fn">${escapeHtml(f)}</code></td><td class="muted nowrap">${size} KB</td><td class="nowrap"><a class="dl" href="/admin/backup/download?file=${encodeURIComponent(f)}">Descargar</a></td></tr>`;
   }).join('');
   res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Backup - COLUMEN</title>
+<title>Backup · COLUMEN Admin</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
+  :root{--navy:#1a2744;--navy-2:#233050;--cream:#f4f0e4;--cream-2:#ece6d5;--cream-border:#d8d0bc;--gold:#8a6d2b;--gold-soft:#b8974a;--ink:#1c1c1c;--ink-55:rgba(28,28,28,.58);--accent:#6aacd6;--card-border:#e8e2cf;--surface:#fffdf6}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Inter',system-ui,sans-serif;background:#f4f0e4;color:#1c1c1c;min-height:100vh}
-  .topbar{background:#1c1c1c;color:#f4f0e4;padding:16px 28px;display:flex;justify-content:space-between;align-items:center}
-  .topbar h1{font-family:serif;font-size:20px;letter-spacing:.15em;font-weight:400}
-  .topbar a{color:#b8974a;font-size:13px;text-decoration:none;margin-left:18px}
-  .topbar a:hover{color:#f4f0e4}
-  .wrap{max-width:880px;margin:0 auto;padding:28px}
-  .card{background:#fff;border:1px solid #ddd6c4;border-radius:12px;padding:24px;margin-bottom:20px}
-  h2{font-family:serif;font-size:22px;margin-bottom:6px}
-  .sub{color:#8a6d2b;font-size:12px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:18px}
-  .btn{display:inline-block;padding:10px 18px;background:#1c1c1c;color:#f4f0e4;border-radius:999px;text-decoration:none;font-weight:500;font-size:14px}
-  .btn:hover{background:#2a2a2a}
-  table{width:100%;border-collapse:collapse;margin-top:10px}
-  th{background:#1c1c1c;color:#f4f0e4;padding:10px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.08em}
-  td{padding:8px 10px;border-bottom:1px solid #eee8d9;font-size:13px}
-  td a{color:#8a6d2b;text-decoration:none;font-weight:500}
-  .warn{background:#fff3cd;border:1px solid #f0e6b6;color:#856404;padding:14px;border-radius:10px;margin-bottom:20px;font-size:14px;line-height:1.5}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100dvh;font-size:14px}
+  .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4)}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  .brand svg{height:34px;width:auto;display:block}
+  .nav{display:flex;align-items:center;gap:6px}
+  .nav a{color:rgba(244,240,228,.62);font-size:13px;text-decoration:none;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em}
+  .nav a:hover{color:var(--cream);background:rgba(255,255,255,.06)}
+  .nav a.active{color:var(--cream);background:rgba(184,151,74,.18);box-shadow:inset 0 -2px 0 var(--gold-soft)}
+  .nav .sep{width:1px;height:18px;background:rgba(255,255,255,.1);margin:0 6px}
+  .nav .logout{color:rgba(244,240,228,.5)}
+  .nav .logout:hover{color:#f4d6d6;background:rgba(195,80,80,.12)}
+  main{max-width:920px;margin:0 auto;padding:28px 28px 60px}
+  .page-head h1{font-family:'Lora',Georgia,serif;font-size:32px;font-weight:600;color:var(--navy);letter-spacing:-.01em;line-height:1.1;margin-bottom:6px}
+  .page-head .lead{color:var(--ink-55);font-size:14px;margin-bottom:24px}
+  .warn{display:grid;grid-template-columns:auto 1fr;gap:14px;background:var(--surface);border:1px solid var(--card-border);border-left:3px solid var(--gold);color:var(--ink);padding:16px 20px;border-radius:12px;margin-bottom:22px;font-size:13.5px;line-height:1.6;align-items:flex-start;box-shadow:0 4px 14px -8px rgba(26,39,68,.15)}
+  .warn .warn-ico{width:24px;height:24px;color:var(--gold);flex-shrink:0;margin-top:2px}
+  .warn .warn-ico svg{width:100%;height:100%}
+  .warn b{color:var(--navy);display:block;margin-bottom:3px;font-weight:600;font-size:14px}
+  .warn code{background:rgba(184,151,74,.1);padding:1px 6px;border-radius:4px;font-size:12.5px;color:var(--gold)}
+  .card{background:var(--surface);border:1px solid var(--card-border);border-radius:14px;padding:26px 28px;margin-bottom:18px;box-shadow:0 6px 24px -10px rgba(26,39,68,.08);transition:box-shadow .25s,transform .35s cubic-bezier(.2,.8,.2,1)}
+  .card:hover{box-shadow:0 14px 36px -14px rgba(26,39,68,.18)}
+  .card h2{font-family:'Lora',Georgia,serif;font-size:22px;font-weight:600;color:var(--navy);margin-bottom:6px;letter-spacing:-.01em}
+  .card .meta{color:var(--gold);font-size:11.5px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:18px;font-weight:600}
+  .card .meta code{background:rgba(184,151,74,.08);padding:1px 6px;border-radius:4px;font-size:11px;text-transform:none;letter-spacing:0;color:var(--ink-55)}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;background:var(--navy);color:var(--cream);border-radius:10px;text-decoration:none;font-weight:500;font-size:13.5px;font-family:inherit;border:none;cursor:pointer;transition:background .2s,box-shadow .2s,transform .1s}
+  .btn:hover{background:var(--navy-2);box-shadow:0 8px 18px -6px rgba(26,39,68,.4)}
+  .btn:active{transform:scale(.97)}
+  .btn svg{width:16px;height:16px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  thead th{background:var(--navy);color:rgba(244,240,228,.92);padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+  thead th:first-child{padding-left:18px;border-radius:8px 0 0 0}
+  thead th:last-child{padding-right:18px;border-radius:0 8px 0 0}
+  tbody td{padding:12px 14px;border-bottom:1px solid #eee8d9;font-size:13px;vertical-align:middle}
+  tbody td:first-child{padding-left:18px}
+  tbody td:last-child{padding-right:18px}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover td{background:#faf6ea}
+  td.muted{color:var(--ink-55)}
+  td.nowrap{white-space:nowrap}
+  .when{font-weight:500;color:var(--navy);margin-bottom:2px}
+  .reason{display:inline-block;background:rgba(184,151,74,.12);color:var(--gold);padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-left:4px}
+  .fn{font-size:11px;color:rgba(28,28,28,.4);font-family:ui-monospace,SFMono-Regular,monospace}
+  .dl{color:var(--gold);text-decoration:none;font-weight:600;font-size:12.5px;padding:6px 12px;border:1.5px solid var(--cream-border);border-radius:8px;display:inline-flex;align-items:center;gap:6px;transition:background .2s,border-color .2s,color .2s}
+  .dl:hover{background:var(--gold);color:var(--cream);border-color:var(--gold)}
+  .dl::before{content:'↓';font-size:14px;line-height:1}
+  .empty{color:var(--ink-55);font-size:14px;text-align:center;padding:32px 0;font-style:italic}
+  @media(max-width:640px){main{padding:18px 16px 40px}.topbar{padding:12px 16px}.nav a{padding:7px 10px;font-size:12.5px}.brand svg{height:30px}.nav a:not(.active):not(.logout){display:none}.card{padding:20px}.warn{padding:14px 16px;font-size:13px}}
 </style></head><body>
-<div class="topbar"><h1>COLUMEN</h1><div><a href="/admin">Consultas</a><a href="/admin/inbox">WhatsApp</a><a href="/admin/backup">Backup</a><a href="/admin/logout">Salir</a></div></div>
-<div class="wrap">
-  <div class="warn"><b>⚠️ Persistencia crítica</b>: los backups viven en <code>/data/backups/</code>. Si <code>/data</code> no tiene volumen montado en EasyPanel, se pierden en cada rebuild junto con la DB principal. Usá <b>Descargar DB actual</b> para guardar una copia off-site.</div>
+<div class="topbar">
+  <a href="/admin" class="brand" aria-label="Columen Admin">
+    <svg viewBox="0 0 690 170" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="62" cy="84" r="43" fill="none" stroke="#ffffff" stroke-width="2.2"/>
+      <path d="M 92.3 68.6 A 34 34 0 1 0 92.3 99.4" fill="none" stroke="#6aacd6" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="92.3" cy="68.6" r="5" fill="#6aacd6"/>
+      <circle cx="92.3" cy="99.4" r="5" fill="#6aacd6"/>
+      <line x1="124" y1="42" x2="124" y2="128" stroke="#ffffff" stroke-width="1.4" opacity="0.5"/>
+      <text x="140" y="98" font-family="'Lora',Georgia,serif" font-size="56" font-weight="700" letter-spacing="5" fill="#ffffff">COLUMEN</text>
+      <text x="142" y="126" font-family="'Inter',sans-serif" font-size="14.5" font-weight="600" letter-spacing="5" fill="#ffffff">LEGAL &amp; NOTARIAL</text>
+    </svg>
+  </a>
+  <nav class="nav">
+    <a href="/admin">Consultas</a>
+    <a href="/admin/inbox">WhatsApp</a>
+    <a href="/admin/backup" class="active">Backup</a>
+    <span class="sep"></span>
+    <a href="/admin/logout" class="logout">Salir</a>
+  </nav>
+</div>
+<main>
+  <div class="page-head">
+    <h1>Backup</h1>
+    <div class="lead">Snapshots automáticos y descarga manual de la base de datos.</div>
+  </div>
+  <div class="warn">
+    <div class="warn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+    <div><b>Persistencia crítica</b>Los backups viven en <code>/data/backups/</code>. Si <code>/data</code> no tiene volumen montado en EasyPanel, se pierden en cada rebuild junto con la DB principal. Descargá la DB actual periódicamente para guardar una copia off-site.</div>
+  </div>
   <div class="card">
     <h2>DB actual</h2>
-    <div class="sub">${liveSize} KB · ${DB_PATH}</div>
-    <a class="btn" href="/admin/backup/download">⬇ Descargar DB actual</a>
+    <div class="meta">${liveSize} KB · <code>${DB_PATH}</code></div>
+    <a class="btn" href="/admin/backup/download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar DB actual</a>
   </div>
   <div class="card">
     <h2>Snapshots</h2>
-    <div class="sub">${files.length} backups · se conservan los últimos ${BACKUP_KEEP}</div>
-    ${files.length ? `<table><thead><tr><th>Archivo</th><th>Tamaño</th><th></th></tr></thead><tbody>${list}</tbody></table>` : '<p style="color:#999">No hay snapshots aún.</p>'}
+    <div class="meta">${files.length} backups · se conservan los últimos ${BACKUP_KEEP}</div>
+    ${files.length ? `<table><thead><tr><th>Snapshot</th><th>Tamaño</th><th></th></tr></thead><tbody>${list}</tbody></table>` : '<div class="empty">No hay snapshots aún. Se generan al startup, cada hora y al recibir nuevas consultas.</div>'}
   </div>
-</div>
+</main>
 </body></html>`);
 });
 
@@ -642,11 +823,16 @@ app.get('/admin/inbox', (req, res) => {
   button{font-family:inherit}
 
   /* Columen topbar */
-  .topbar{background:#1c1c1c;color:#f4f0e4;padding:10px 22px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
-  .topbar h1{font-family:serif;font-size:18px;font-weight:400;letter-spacing:.15em}
-  .topbar a{color:#b8974a;font-size:13px;margin-right:16px}
-  .topbar a:hover{color:#f4f0e4}
-  .topbar .r a:last-child{margin-right:0}
+  .topbar{background:#1a2744;color:#f4f0e4;padding:10px 22px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4);z-index:5}
+  .topbar .brand{display:flex;align-items:center;gap:10px}
+  .topbar .brand svg{height:30px;width:auto;display:block}
+  .topbar .r{display:flex;align-items:center;gap:4px}
+  .topbar .r a{color:rgba(244,240,228,.62);font-size:13px;padding:7px 12px;border-radius:7px;transition:background .15s,color .15s;letter-spacing:.02em}
+  .topbar .r a:hover{color:#f4f0e4;background:rgba(255,255,255,.06)}
+  .topbar .r a.active{color:#f4f0e4;background:rgba(184,151,74,.18);box-shadow:inset 0 -2px 0 #b8974a}
+  .topbar .r .sep{width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 4px}
+  .topbar .r a.logout{color:rgba(244,240,228,.5)}
+  .topbar .r a.logout:hover{color:#f4d6d6;background:rgba(195,80,80,.12)}
 
   /* WhatsApp layout */
   .layout{flex:1;display:flex;overflow:hidden;background:#EFEAE2}
@@ -799,8 +985,24 @@ app.get('/admin/inbox', (req, res) => {
   }
 </style></head><body>
 <div class="topbar">
-  <h1>COLUMEN</h1>
-  <div class="r"><a href="/admin">Consultas</a><a href="/admin/inbox">WhatsApp</a><a href="/admin/backup">Backup</a><a href="/admin/logout">Salir</a></div>
+  <a href="/admin" class="brand" aria-label="Columen Admin">
+    <svg viewBox="0 0 690 170" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="62" cy="84" r="43" fill="none" stroke="#ffffff" stroke-width="2.2"/>
+      <path d="M 92.3 68.6 A 34 34 0 1 0 92.3 99.4" fill="none" stroke="#6aacd6" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="92.3" cy="68.6" r="5" fill="#6aacd6"/>
+      <circle cx="92.3" cy="99.4" r="5" fill="#6aacd6"/>
+      <line x1="124" y1="42" x2="124" y2="128" stroke="#ffffff" stroke-width="1.4" opacity="0.5"/>
+      <text x="140" y="98" font-family="'Lora',Georgia,serif" font-size="56" font-weight="700" letter-spacing="5" fill="#ffffff">COLUMEN</text>
+      <text x="142" y="126" font-family="'Inter',sans-serif" font-size="14.5" font-weight="600" letter-spacing="5" fill="#ffffff">LEGAL &amp; NOTARIAL</text>
+    </svg>
+  </a>
+  <div class="r">
+    <a href="/admin">Consultas</a>
+    <a href="/admin/inbox" class="active">WhatsApp</a>
+    <a href="/admin/backup">Backup</a>
+    <span class="sep"></span>
+    <a href="/admin/logout" class="logout">Salir</a>
+  </div>
 </div>
 <div class="layout" id="layout">
   <div class="sidebar">
