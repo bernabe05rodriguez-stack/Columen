@@ -232,9 +232,18 @@ app.get('/admin/login', (req, res) => {
   body{font-family:'Inter',system-ui,sans-serif;color:var(--ink);min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--navy);position:relative;overflow:hidden}
   body::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 900px 700px at 80% 10%,rgba(184,151,74,.18),transparent 60%),radial-gradient(ellipse 700px 600px at 0% 100%,rgba(106,172,214,.12),transparent 65%);pointer-events:none}
   body::after{content:'';position:absolute;inset:0;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");opacity:.06;mix-blend-mode:soft-light;pointer-events:none}
-  .card{background:#fff;border-radius:18px;padding:44px 40px 36px;width:100%;max-width:400px;box-shadow:0 30px 80px -20px rgba(0,0,0,.5),0 8px 24px -8px rgba(0,0,0,.25);position:relative;z-index:1;border:1px solid rgba(255,255,255,.08)}
-  .logo{display:flex;justify-content:center;margin-bottom:18px}
-  .logo svg{width:140px;height:auto}
+  .card{background:#fff;border-radius:20px;padding:48px 44px 38px;width:100%;max-width:440px;box-shadow:0 30px 80px -20px rgba(0,0,0,.5),0 8px 24px -8px rgba(0,0,0,.25);position:relative;z-index:1;border:1px solid rgba(255,255,255,.08)}
+  .logo{display:flex;justify-content:center;margin-bottom:22px}
+  .logo svg{width:200px;height:auto;max-width:100%}
+  @media(max-width:480px){
+    body{padding:16px;align-items:flex-start;padding-top:8vh}
+    .card{padding:36px 24px 28px;border-radius:18px}
+    .logo svg{width:170px}
+    .sub{font-size:11px;letter-spacing:.16em;margin-bottom:24px}
+    label{font-size:11px}
+    input{font-size:16px;padding:13px 14px}
+    button{padding:14px;font-size:15px}
+  }
   .sub{color:var(--gold);font-size:11.5px;text-align:center;margin-bottom:28px;letter-spacing:.18em;text-transform:uppercase;font-weight:500}
   .err{background:#fdf0ee;border:1px solid #f5d6cf;color:#a3372a;padding:11px 14px;border-radius:10px;font-size:13.5px;margin-bottom:18px;text-align:center}
   label{display:block;font-size:11.5px;font-weight:600;color:var(--gold);margin-bottom:7px;letter-spacing:.08em;text-transform:uppercase}
@@ -327,14 +336,14 @@ app.get('/admin', (req, res) => {
     const isJ = c.area?.toLowerCase().includes('juridic');
     return `
     <tr>
-      <td class="muted">#${c.id}</td>
-      <td class="nowrap muted">${escapeHtml(c.created_at || '')}</td>
-      <td class="nowrap"><a class="tel" href="/admin/inbox?tel=${encodeURIComponent(c.telefono)}" title="Abrir chat">${escapeHtml(c.telefono)}</a></td>
-      <td><span class="badge ${isJ ? 'badge-j' : 'badge-n'}"><span class="dot"></span>${escapeHtml(c.area)}</span></td>
-      <td class="strong">${escapeHtml(c.nombre)}</td>
-      <td class="muted">${escapeHtml(c.dni)}</td>
-      <td class="muted">${escapeHtml(c.email)}</td>
-      <td class="consulta-cell" title="${escapeHtml(c.consulta)}">${escapeHtml(c.consulta)}</td>
+      <td class="muted" data-label="#">#${c.id}</td>
+      <td class="nowrap muted" data-label="Fecha">${escapeHtml(c.created_at || '')}</td>
+      <td class="nowrap" data-label="Teléfono"><a class="tel" href="/admin/inbox?tel=${encodeURIComponent(c.telefono)}" title="Abrir chat">${escapeHtml(c.telefono)}</a></td>
+      <td data-label="Área"><span class="badge ${isJ ? 'badge-j' : 'badge-n'}"><span class="dot"></span>${escapeHtml(c.area)}</span></td>
+      <td class="strong" data-label="Nombre">${escapeHtml(c.nombre)}</td>
+      <td class="muted" data-label="DNI">${escapeHtml(c.dni)}</td>
+      <td class="muted" data-label="Email">${escapeHtml(c.email)}</td>
+      <td class="consulta-cell" data-label="Consulta" title="${escapeHtml(c.consulta)}">${escapeHtml(c.consulta)}</td>
     </tr>`;
   }).join('');
 
@@ -351,9 +360,9 @@ app.get('/admin', (req, res) => {
   body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100dvh;font-size:14px}
   .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4)}
   .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
-  .brand svg{height:34px;width:auto;display:block}
+  .brand svg{height:48px;width:auto;display:block;max-width:100%}
   .nav{display:flex;align-items:center;gap:6px}
-  .nav a{color:rgba(244,240,228,.62);font-size:13px;text-decoration:none;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em}
+  .nav a{color:rgba(244,240,228,.62);font-size:13px;text-decoration:none;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em;white-space:nowrap}
   .nav a:hover{color:var(--cream);background:rgba(255,255,255,.06)}
   .nav a.active{color:var(--cream);background:rgba(184,151,74,.18);box-shadow:inset 0 -2px 0 var(--gold-soft)}
   .nav .sep{width:1px;height:18px;background:rgba(255,255,255,.1);margin:0 6px}
@@ -418,15 +427,47 @@ app.get('/admin', (req, res) => {
   .empty strong{display:block;color:var(--ink);font-size:16px;margin-bottom:4px;font-weight:600}
   @media(max-width:880px){
     .stats{grid-template-columns:1fr 1fr;gap:10px}
-    main{padding:18px 16px 40px}
-    .topbar{padding:12px 16px}
+    main{padding:18px 14px 40px}
+    .topbar{padding:10px 14px;gap:8px}
+    .brand svg{height:40px}
     .nav a{padding:7px 10px;font-size:12.5px}
     .page-head h1{font-size:24px}
     .filters{padding:14px}
     .f.grow{flex-basis:100%}
     thead th{position:static}
+    .stat{padding:18px 18px}
+    .stat .num{font-size:30px}
+    .stat .ico{width:24px;height:24px;top:14px;right:14px}
   }
-  @media(max-width:560px){.stats{grid-template-columns:1fr}.brand svg{height:30px}.nav a:not(.logout){display:none}.nav a.active{display:inline-flex}}
+  @media(max-width:560px){
+    .stats{grid-template-columns:1fr 1fr;gap:8px}
+    .brand svg{height:36px}
+    .topbar{padding:8px 12px}
+    .nav{gap:2px}
+    .nav a:not(.active):not(.logout){display:none}
+    .nav .sep{display:none}
+    .page-head h1{font-size:22px}
+    .stat{padding:14px 16px}
+    .stat .num{font-size:24px}
+    .stat .label{font-size:10.5px;letter-spacing:.1em;margin-top:4px}
+    .stat .ico{display:none}
+    .filters{padding:12px;gap:8px}
+    .f input,.f select{font-size:16px;padding:11px 12px}
+    .f-actions{width:100%}
+    .f-actions .btn{flex:1;justify-content:center}
+    .panel{border-radius:10px}
+    /* Tabla → stack de cards en mobile */
+    table,thead,tbody,tr,td{display:block;width:100%}
+    thead{display:none}
+    tbody tr{padding:14px 16px;border-bottom:1px solid #eee8d9;position:relative}
+    tbody tr:last-child{border-bottom:none}
+    tbody td{padding:3px 0;border:none;font-size:13.5px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+    tbody td:first-child,tbody td:last-child{padding-left:0;padding-right:0}
+    tbody td::before{content:attr(data-label);font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--gold);font-weight:600;flex-shrink:0;margin-top:2px;min-width:64px}
+    tbody td.consulta-cell{flex-direction:column;align-items:flex-start;max-width:none;white-space:normal;padding-top:8px;border-top:1px dashed #e6dfca;margin-top:6px}
+    tbody td.consulta-cell::before{margin-bottom:4px}
+    tbody tr:hover td{background:transparent}
+  }
 </style></head><body>
 <div class="topbar">
   <a href="/admin" class="brand" aria-label="Columen Admin">
@@ -540,9 +581,9 @@ app.get('/admin/backup', (req, res) => {
   body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100dvh;font-size:14px}
   .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4)}
   .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
-  .brand svg{height:34px;width:auto;display:block}
+  .brand svg{height:48px;width:auto;display:block;max-width:100%}
   .nav{display:flex;align-items:center;gap:6px}
-  .nav a{color:rgba(244,240,228,.62);font-size:13px;text-decoration:none;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em}
+  .nav a{color:rgba(244,240,228,.62);font-size:13px;text-decoration:none;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em;white-space:nowrap}
   .nav a:hover{color:var(--cream);background:rgba(255,255,255,.06)}
   .nav a.active{color:var(--cream);background:rgba(184,151,74,.18);box-shadow:inset 0 -2px 0 var(--gold-soft)}
   .nav .sep{width:1px;height:18px;background:rgba(255,255,255,.1);margin:0 6px}
@@ -583,7 +624,30 @@ app.get('/admin/backup', (req, res) => {
   .dl:hover{background:var(--gold);color:var(--cream);border-color:var(--gold)}
   .dl::before{content:'↓';font-size:14px;line-height:1}
   .empty{color:var(--ink-55);font-size:14px;text-align:center;padding:32px 0;font-style:italic}
-  @media(max-width:640px){main{padding:18px 16px 40px}.topbar{padding:12px 16px}.nav a{padding:7px 10px;font-size:12.5px}.brand svg{height:30px}.nav a:not(.active):not(.logout){display:none}.card{padding:20px}.warn{padding:14px 16px;font-size:13px}}
+  @media(max-width:880px){main{padding:18px 14px 40px}.topbar{padding:10px 14px;gap:8px}.brand svg{height:40px}.nav a{padding:7px 10px;font-size:12.5px}.page-head h1{font-size:24px}.card{padding:22px 20px}}
+  @media(max-width:640px){
+    .topbar{padding:8px 12px}
+    .brand svg{height:36px}
+    .nav{gap:2px}
+    .nav a:not(.active):not(.logout){display:none}
+    .nav .sep{display:none}
+    .page-head h1{font-size:22px}
+    .card{padding:18px}
+    .card h2{font-size:18px}
+    .warn{padding:14px 16px;font-size:13px;grid-template-columns:1fr;gap:8px}
+    .warn .warn-ico{width:22px;height:22px}
+    table{font-size:12.5px}
+    table,thead,tbody,tr,td{display:block;width:100%}
+    thead{display:none}
+    tbody tr{padding:12px 4px;border-bottom:1px solid #eee8d9}
+    tbody tr:last-child{border-bottom:none}
+    tbody td{padding:3px 0;border:none;display:flex;justify-content:space-between;gap:10px;align-items:center}
+    tbody td:first-child{padding-left:0}
+    tbody td:last-child{padding-right:0;justify-content:flex-end;margin-top:4px}
+    .when{margin-bottom:0}
+    .fn{font-size:10.5px}
+    .btn{width:100%;justify-content:center}
+  }
 </style></head><body>
 <div class="topbar">
   <a href="/admin" class="brand" aria-label="Columen Admin">
@@ -871,7 +935,18 @@ app.get('/admin/inbox', (req, res) => {
   /* Columen topbar */
   .topbar{background:#1a2744;color:#f4f0e4;padding:10px 22px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4);z-index:5}
   .topbar .brand{display:flex;align-items:center;gap:10px}
-  .topbar .brand svg{height:30px;width:auto;display:block}
+  .topbar .brand svg{height:42px;width:auto;display:block;max-width:100%}
+  @media(max-width:768px){
+    .topbar{padding:8px 14px}
+    .topbar .brand svg{height:34px}
+    .topbar .r a{padding:6px 9px;font-size:12px}
+    .topbar .r .sep{display:none}
+    .topbar .r a:not(.active):not(.logout){display:none}
+  }
+  @media(max-width:480px){
+    .topbar .brand svg{height:30px}
+    .topbar .r a{padding:5px 7px;font-size:11.5px}
+  }
   .topbar .r{display:flex;align-items:center;gap:4px}
   .topbar .r a{color:rgba(244,240,228,.62);font-size:13px;padding:7px 12px;border-radius:7px;transition:background .15s,color .15s;letter-spacing:.02em}
   .topbar .r a:hover{color:#f4f0e4;background:rgba(255,255,255,.06)}
