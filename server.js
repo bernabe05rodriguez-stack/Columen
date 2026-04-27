@@ -469,7 +469,7 @@ app.get('/admin', (req, res) => {
   .filter-info::before{content:'•';color:var(--gold-soft);font-size:18px;line-height:1}
   .table-wrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse}
-  thead th{background:var(--navy);color:rgba(244,240,228,.92);padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;text-align:left;font-weight:600;white-space:nowrap;position:sticky;top:62px;z-index:5}
+  thead th{background:var(--navy);color:rgba(244,240,228,.92);padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:.1em;text-align:left;font-weight:600;white-space:nowrap}
   thead th:first-child{padding-left:22px}
   thead th:last-child{padding-right:22px}
   tbody td{padding:13px 14px;border-bottom:1px solid #eee8d9;font-size:13.5px;vertical-align:top}
@@ -503,7 +503,6 @@ app.get('/admin', (req, res) => {
     .page-head h1{font-size:24px}
     .filters{padding:14px}
     .f.grow{flex-basis:100%}
-    thead th{position:static}
     .stat{padding:18px 18px}
     .stat .num{font-size:30px}
     .stat .ico{width:24px;height:24px;top:14px;right:14px}
