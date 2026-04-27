@@ -26,6 +26,43 @@ db.pragma('journal_mode = WAL');
 const BACKUP_DIR = path.join(DB_DIR, 'backups');
 if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
 const BACKUP_KEEP = 50;
+const BACKUP_OFFSITE_TOKEN = process.env.BACKUP_OFFSITE_TOKEN || '';
+const BACKUP_OFFSITE_REPO = process.env.BACKUP_OFFSITE_REPO || '';
+const BACKUP_OFFSITE_BRANCH = process.env.BACKUP_OFFSITE_BRANCH || 'main';
+
+async function pushBackupOffsite(localPath, repoPath) {
+  if (!BACKUP_OFFSITE_TOKEN || !BACKUP_OFFSITE_REPO) return;
+  try {
+    const buf = fs.readFileSync(localPath);
+    const content = buf.toString('base64');
+    const url = `https://api.github.com/repos/${BACKUP_OFFSITE_REPO}/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(BACKUP_OFFSITE_BRANCH)}`;
+    const headers = {
+      Authorization: `Bearer ${BACKUP_OFFSITE_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    let sha = null;
+    try {
+      const head = await fetch(url, { headers });
+      if (head.ok) sha = (await head.json()).sha;
+    } catch {}
+    const putUrl = `https://api.github.com/repos/${BACKUP_OFFSITE_REPO}/contents/${repoPath.split('/').map(encodeURIComponent).join('/')}`;
+    const body = { message: `backup: ${repoPath} (${new Date().toISOString()})`, content, branch: BACKUP_OFFSITE_BRANCH };
+    if (sha) body.sha = sha;
+    const r = await fetch(putUrl, { method: 'PUT', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) {
+      const t = await r.text();
+      console.error('[backup-offsite] failed', r.status, t.slice(0, 200));
+      return false;
+    }
+    console.log('[backup-offsite] pushed', repoPath, `(${(buf.length/1024).toFixed(1)} KB)`);
+    return true;
+  } catch (e) {
+    console.error('[backup-offsite] error', e.message);
+    return false;
+  }
+}
+
 let backupRunning = false;
 async function snapshotDB(reason = 'periodic') {
   if (backupRunning) return;
@@ -39,6 +76,11 @@ async function snapshotDB(reason = 'periodic') {
       try { fs.unlinkSync(path.join(BACKUP_DIR, files.shift())); } catch {}
     }
     console.log('[backup] snapshot', reason, path.basename(dst));
+    if (reason === 'hourly' || reason === 'startup' || reason === 'manual') {
+      const today = new Date().toISOString().slice(0, 10);
+      pushBackupOffsite(dst, 'snapshots/latest.db').catch(() => {});
+      pushBackupOffsite(dst, `snapshots/daily/columen-${today}.db`).catch(() => {});
+    }
   } catch (e) {
     console.error('[backup] error', e.message);
   } finally {
