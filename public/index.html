@@ -504,7 +504,7 @@
 
 <footer>
   <div class="container foot">
-    <a href="#" class="logo-wrap" aria-label="Columen — Inicio"><svg id="footLogo" viewBox="0 0 690 170" xmlns="http://www.w3.org/2000/svg"><use href="#logo"/></svg></a>
+    <a href="#" class="logo-wrap" aria-label="Columen — Inicio"><svg viewBox="0 0 510 170" xmlns="http://www.w3.org/2000/svg"><use href="#logo"/></svg></a>
     <div class="foot-info">
       <div>Catamarca 170, Planta Baja, oficinas 8 y 10 · Ciudad de Mendoza</div>
       <div class="foot-legal"><a href="/legales/privacidad">Política de privacidad</a> · <a href="/legales/aviso-legal">Aviso legal</a></div>
@@ -543,27 +543,6 @@
 <script>
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1,rootMargin:'0px 0px -40px 0px'});
 document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
-
-// Ajustar viewBox del logo del footer al bounding box real del contenido (recorta el espacio en blanco para que se vea bien centrado en mobile)
-function fitFootLogo(){
-  const svg = document.getElementById('footLogo');
-  if (!svg) return;
-  try {
-    const bbox = svg.getBBox();
-    if (bbox && bbox.width > 0) {
-      const pad = 6;
-      svg.setAttribute('viewBox', (bbox.x - pad) + ' 0 ' + (bbox.width + pad * 2) + ' 170');
-    }
-  } catch(e){}
-}
-// Las webfonts (Lora) suelen cargar después del DOM. Reintentar después de fonts.ready y de un fallback timeout.
-if (document.fonts && document.fonts.ready) {
-  document.fonts.ready.then(fitFootLogo);
-}
-setTimeout(fitFootLogo, 80);
-setTimeout(fitFootLogo, 400);
-setTimeout(fitFootLogo, 1200);
-window.addEventListener('load', fitFootLogo);
 </script>
 </body>
 </html>
