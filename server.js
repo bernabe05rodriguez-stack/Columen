@@ -78,8 +78,12 @@ async function snapshotDB(reason = 'periodic') {
     console.log('[backup] snapshot', reason, path.basename(dst));
     if (reason === 'hourly' || reason === 'startup' || reason === 'manual') {
       const today = new Date().toISOString().slice(0, 10);
-      pushBackupOffsite(dst, 'snapshots/latest.db').catch(() => {});
-      pushBackupOffsite(dst, `snapshots/daily/columen-${today}.db`).catch(() => {});
+      (async () => {
+        try {
+          await pushBackupOffsite(dst, 'snapshots/latest.db');
+          await pushBackupOffsite(dst, `snapshots/daily/columen-${today}.db`);
+        } catch {}
+      })();
     }
   } catch (e) {
     console.error('[backup] error', e.message);
