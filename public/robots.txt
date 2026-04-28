@@ -1,0 +1,11 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /admin/
+Disallow: /webhook
+Disallow: /bot-debug
+Disallow: /healthz
+Disallow: /consulta
+Disallow: /legales/
+
+Sitemap: https://columen.ar/sitemap.xml

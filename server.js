@@ -222,6 +222,7 @@ app.use(helmet({
       'img-src': ["'self'", 'data:', 'https:', 'blob:'],
       'media-src': ["'self'", 'blob:', 'https:'],
       'connect-src': ["'self'", 'https://graph.facebook.com'],
+      'frame-src': ['https://www.google.com', 'https://maps.google.com'],
       'frame-ancestors': ["'none'"],
       'base-uri': ["'self'"],
       'form-action': ["'self'"],
@@ -2427,6 +2428,14 @@ app.get('/legales/privacidad', (req, res) => {
 });
 app.get('/legales/aviso-legal', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'legales', 'aviso-legal.html'));
+});
+
+// --- SEO files ---
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain').sendFile(path.join(__dirname, 'public', 'robots.txt'));
+});
+app.get('/sitemap.xml', (req, res) => {
+  res.type('application/xml').sendFile(path.join(__dirname, 'public', 'sitemap.xml'));
 });
 
 // --- Health check (público, para EasyPanel/Cloudflare) ---
