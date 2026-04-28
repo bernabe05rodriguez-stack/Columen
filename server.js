@@ -7,24 +7,18 @@ const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
 
+// Config centralizada — único lugar que lee process.env.*
+const config = require('./src/config');
+const {
+  NODE_ENV, IS_PROD, PORT,
+  ADMIN_USER, ADMIN_PASS, ADMIN_PASS_HASH, SESSION_SECRET,
+  WA_TOKEN, WA_PHONE_ID, WA_VERIFY_TOKEN, APP_SECRET,
+  PUBLIC_URL,
+  BACKUP_OFFSITE_TOKEN, BACKUP_OFFSITE_REPO, BACKUP_OFFSITE_BRANCH,
+} = config;
+config.logConfigWarnings();
+
 const app = express();
-const PORT = process.env.PORT || 80;
-const NODE_ENV = process.env.NODE_ENV || 'development';
-const IS_PROD = NODE_ENV === 'production';
-const ADMIN_USER = process.env.ADMIN_USER || 'admin';
-const ADMIN_PASS = process.env.ADMIN_PASS || '';
-const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH || '';
-const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
-
-const WA_TOKEN = process.env.WHATSAPP_TOKEN || '';
-const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID || '';
-const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'columen-verify-2026';
-const APP_SECRET = process.env.APP_SECRET || '';
-const PUBLIC_URL = process.env.PUBLIC_URL || 'https://redhawk-columen.bm6z1s.easypanel.host';
-
-if (!APP_SECRET) console.error('[WA] APP_SECRET not set — webhook signature verification will FAIL');
-if (!ADMIN_PASS_HASH && !ADMIN_PASS) console.error('[auth] No ADMIN_PASS_HASH or ADMIN_PASS configured — login disabled');
-if (!ADMIN_PASS_HASH && ADMIN_PASS) console.warn('[auth] Using plaintext ADMIN_PASS fallback — set ADMIN_PASS_HASH (bcrypt) and remove ADMIN_PASS ASAP');
 
 // Anonimiza teléfono para logs en producción (mantiene 4 últimos dígitos)
 function maskTel(tel) {
@@ -33,23 +27,12 @@ function maskTel(tel) {
   return tel.length > 4 ? '+...' + tel.slice(-4) : tel;
 }
 
-// Database - use /data if exists (Docker volume), fallback to ./data
+// Database — abierta y configurada en src/db/index.js (única fuente de verdad)
 const fs = require('fs');
-const DB_DIR = fs.existsSync('/data') ? '/data' : './data';
-if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
-const DB_PATH = path.join(DB_DIR, 'columen.db');
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('synchronous = NORMAL');  // balance performance/durability con WAL
-db.pragma('foreign_keys = ON');
-db.pragma('temp_store = MEMORY');
-
-const BACKUP_DIR = path.join(DB_DIR, 'backups');
-if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
+const dbModule = require('./src/db');
+const { db, runMigration, DB_PATH, BACKUP_DIR, DB_DIR } = dbModule;
 const BACKUP_KEEP = 50;
-const BACKUP_OFFSITE_TOKEN = process.env.BACKUP_OFFSITE_TOKEN || '';
-const BACKUP_OFFSITE_REPO = process.env.BACKUP_OFFSITE_REPO || '';
-const BACKUP_OFFSITE_BRANCH = process.env.BACKUP_OFFSITE_BRANCH || 'main';
+// BACKUP_OFFSITE_TOKEN/REPO/BRANCH ya importados desde src/config arriba
 
 async function pushBackupOffsite(localPath, repoPath) {
   if (!BACKUP_OFFSITE_TOKEN || !BACKUP_OFFSITE_REPO) return;
@@ -158,14 +141,7 @@ db.exec(`
   );
 `);
 
-db.exec(`CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY, applied_at DATETIME DEFAULT (datetime('now','localtime')))`);
-function runMigration(name, fn) {
-  const existing = db.prepare('SELECT name FROM _migrations WHERE name = ?').get(name);
-  if (existing) return;
-  fn();
-  db.prepare('INSERT INTO _migrations (name) VALUES (?)').run(name);
-  console.log('[migration] applied:', name);
-}
+// _migrations table + runMigration() ya inicializados por src/db
 // Pre-existing rows were stored in UTC (before TZ was set). Shift them -3h to Argentina time.
 runMigration('fix_tz_argentina_2026_04', () => {
   db.prepare("UPDATE consultas SET created_at = datetime(created_at, '-3 hours')").run();
