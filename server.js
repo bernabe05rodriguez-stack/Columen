@@ -40,6 +40,9 @@ if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
 const DB_PATH = path.join(DB_DIR, 'columen.db');
 const db = new Database(DB_PATH);
 db.pragma('journal_mode = WAL');
+db.pragma('synchronous = NORMAL');  // balance performance/durability con WAL
+db.pragma('foreign_keys = ON');
+db.pragma('temp_store = MEMORY');
 
 const BACKUP_DIR = path.join(DB_DIR, 'backups');
 if (!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive: true });
@@ -194,9 +197,53 @@ runMigration('add_labels_2026_04', () => {
     );
   }
 });
+runMigration('add_indexes_2026_04', () => {
+  // Aditivas: solo CREATE INDEX IF NOT EXISTS, nunca tocan datos
+  db.exec('CREATE INDEX IF NOT EXISTS idx_consultas_area ON consultas(area)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_consultas_created ON consultas(created_at DESC)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(wa_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_messages_status ON messages(status) WHERE status IS NOT NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_conv_last_at ON conversations(last_at DESC)');
+});
+runMigration('processed_messages_2026_04', () => {
+  // Reemplaza el Set en memoria — sobrevive a restarts
+  db.exec(`CREATE TABLE IF NOT EXISTS processed_messages (
+    wa_id TEXT PRIMARY KEY,
+    processed_at DATETIME DEFAULT (datetime('now','localtime'))
+  )`);
+});
+runMigration('add_templates_2026_04', () => {
+  db.exec(`CREATE TABLE IF NOT EXISTS templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    body TEXT NOT NULL,
+    created_at DATETIME DEFAULT (datetime('now','localtime'))
+  )`);
+  // Seed con plantillas frecuentes de un estudio legal
+  const existing = db.prepare('SELECT COUNT(*) as c FROM templates').get().c;
+  if (!existing) {
+    const seeds = [
+      ['Saludo inicial', 'Hola, gracias por contactarte con Columen. Soy parte del equipo y estaré asistiéndote.'],
+      ['Pedido de DNI', 'Para avanzar con tu consulta necesito que me envíes una foto del DNI (frente y dorso).'],
+      ['Pedido de documentación', 'Para analizar tu caso necesito que me envíes la documentación correspondiente. Podés mandar fotos o PDF por acá mismo.'],
+      ['Honorarios', 'Los honorarios se acuerdan por escrito antes de iniciar el trabajo, conforme a las pautas del Colegio de Abogados de Mendoza. ¿Querés que te detalle el costo de tu caso?'],
+      ['Cierre + agenda', 'Perfecto. Te confirmo la reunión y te paso el resumen por acá. Cualquier consulta, escribime.'],
+      ['Fuera de horario', 'Recibimos tu mensaje fuera del horario de atención (Lun-Vie 9 a 18 hs Mendoza). Te respondemos en cuanto retomemos.'],
+    ];
+    seeds.forEach(([n, b]) => db.prepare('INSERT INTO templates (name, body) VALUES (?,?)').run(n, b));
+  }
+});
 
-// Cleanup old sessions (older than 24h)
+// Cleanup old sessions (older than 24h) y processed_messages (older than 7 días)
 db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
+db.exec(`DELETE FROM processed_messages WHERE processed_at < datetime('now', '-7 days')`);
+// Cleanup periódico cada 6h
+setInterval(() => {
+  try {
+    db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
+    db.exec(`DELETE FROM processed_messages WHERE processed_at < datetime('now', '-7 days')`);
+  } catch (e) { console.error('[cleanup] error', e.message); }
+}, 6 * 60 * 60 * 1000);
 
 app.use(express.json({
   limit: '1mb',
@@ -428,6 +475,44 @@ app.get('/admin/count', (req, res) => {
   res.json({ count: c });
 });
 
+// Export consultas a CSV (con filtros opcionales)
+app.get('/admin/export.csv', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).send('unauth');
+  const where = [];
+  const params = [];
+  const q = (req.query.q || '').trim();
+  const area = (req.query.area || '').trim();
+  const desde = (req.query.desde || '').trim();
+  const hasta = (req.query.hasta || '').trim();
+  if (q) {
+    where.push('(nombre LIKE ? OR dni LIKE ? OR email LIKE ? OR telefono LIKE ? OR consulta LIKE ?)');
+    const like = '%' + q + '%';
+    params.push(like, like, like, like, like);
+  }
+  if (area) { where.push('LOWER(area) LIKE ?'); params.push('%' + area.toLowerCase() + '%'); }
+  if (desde) { where.push("date(created_at) >= date(?)"); params.push(desde); }
+  if (hasta) { where.push("date(created_at) <= date(?)"); params.push(hasta); }
+  const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  const rows = db.prepare(`SELECT id, created_at, telefono, area, nombre, dni, email, consulta FROM consultas ${whereSql} ORDER BY created_at DESC`).all(...params);
+  // CSV escape: " → "" y wrap si contiene , " \n \r ;
+  function csvCell(v) {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    if (/[",\n\r;]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  const fname = 'columen-consultas-' + new Date().toISOString().slice(0,10) + '.csv';
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+  // BOM para que Excel detecte UTF-8 correctamente
+  res.write('﻿');
+  res.write(['id','fecha','telefono','area','nombre','dni','email','consulta'].join(',') + '\r\n');
+  for (const r of rows) {
+    res.write([r.id, r.created_at, r.telefono, r.area, r.nombre, r.dni, r.email, r.consulta].map(csvCell).join(',') + '\r\n');
+  }
+  res.end();
+});
+
 // --- Admin dashboard ---
 app.get('/admin', (req, res) => {
   if (!isAuthenticated(req)) return res.redirect('/admin/login');
@@ -652,6 +737,7 @@ app.get('/admin', (req, res) => {
       <div class="f-actions">
         <button type="submit" class="btn">Filtrar</button>
         ${filtered ? '<a href="/admin" class="btn ghost">Limpiar</a>' : ''}
+        <a href="/admin/export.csv?${new URLSearchParams({q:f.q,area:f.area,desde:f.desde,hasta:f.hasta}).toString()}" class="btn ghost" title="Descargar CSV de las consultas filtradas">⬇ CSV</a>
       </div>
     </form>
     ${filtered ? `<div class="filter-info">Mostrando ${total} de ${totalAll} consultas</div>` : ''}
@@ -894,6 +980,36 @@ app.delete('/admin/labels/:id', requireCsrf, (req, res) => {
   res.json({ ok: true });
 });
 
+// --- Plantillas de respuesta ---
+app.get('/admin/templates', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  res.json({ templates: db.prepare('SELECT id, name, body FROM templates ORDER BY name').all() });
+});
+app.post('/admin/templates', requireCsrf, (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const name = (req.body?.name || '').trim();
+  const body = (req.body?.body || '').trim();
+  if (!name || !body) return res.status(400).json({ error: 'name_and_body_required' });
+  if (name.length > 80) return res.status(400).json({ error: 'name_too_long' });
+  if (body.length > 4000) return res.status(400).json({ error: 'body_too_long' });
+  const r = db.prepare('INSERT INTO templates (name, body) VALUES (?,?)').run(name, body);
+  res.json({ id: r.lastInsertRowid, name, body });
+});
+app.put('/admin/templates/:id', requireCsrf, (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const id = parseInt(req.params.id, 10);
+  const name = (req.body?.name || '').trim();
+  const body = (req.body?.body || '').trim();
+  if (!name || !body) return res.status(400).json({ error: 'name_and_body_required' });
+  db.prepare('UPDATE templates SET name=?, body=? WHERE id=?').run(name, body, id);
+  res.json({ ok: true });
+});
+app.delete('/admin/templates/:id', requireCsrf, (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  db.prepare('DELETE FROM templates WHERE id = ?').run(parseInt(req.params.id, 10));
+  res.json({ ok: true });
+});
+
 app.post('/admin/inbox/:tel/labels/:labelId', requireCsrf, (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const tel = req.params.tel;
@@ -927,6 +1043,22 @@ app.get('/admin/inbox/:tel/messages', (req, res) => {
     canSend = false;
   }
   res.json({ messages, conversation: { ...conv, nombre, labels }, canSend });
+});
+
+// Búsqueda dentro de un chat
+app.get('/admin/inbox/:tel/search', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const tel = req.params.tel;
+  const q = (req.query.q || '').trim();
+  if (!q || q.length < 2) return res.json({ matches: [] });
+  const like = '%' + q.replace(/[%_]/g, '\\$&') + '%';
+  const matches = db.prepare(
+    `SELECT id, direction, type, body, created_at, media_id, media_mime, status
+     FROM messages
+     WHERE telefono = ? AND body LIKE ? ESCAPE '\\'
+     ORDER BY id DESC LIMIT 80`
+  ).all(tel, like);
+  res.json({ matches, query: q });
 });
 
 // Send image (base64 JSON body)
@@ -1271,6 +1403,34 @@ app.get('/admin/inbox', (req, res) => {
   .toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#41525D;color:#fff;padding:10px 20px;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.18);font-size:14px;z-index:400;opacity:0;transition:opacity .2s,bottom .2s;pointer-events:none}
   .toast.show{opacity:1;bottom:40px}
   .toast.error{background:#C23B1E}
+
+  /* Search-in-chat bar */
+  .search-bar{background:#F0F2F5;padding:8px 12px;border-bottom:1px solid #E9EDEF;border-left:1px solid #E9EDEF;display:none;gap:8px;align-items:center;flex-shrink:0}
+  .search-bar.open{display:flex}
+  .search-bar input{flex:1;border:1px solid #DFE5E7;border-radius:18px;padding:7px 14px;font-size:14px;font-family:inherit;outline:none;background:#fff}
+  .search-bar input:focus{border-color:#00A884}
+  .search-bar .close-search{background:transparent;border:none;color:#54656F;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  .search-bar .close-search:hover{background:#E9EDEF}
+  .search-bar .count{font-size:12.5px;color:#54656F;flex-shrink:0;padding:0 6px}
+  /* Highlight search match en bubble */
+  .msg mark{background:#FFE066;color:#111B21;padding:0 2px;border-radius:2px;font-weight:500}
+  .msg.search-hit{outline:2px solid #FFB700;outline-offset:1px}
+
+  /* Templates list */
+  .modal #tplList{padding:0}
+  .tpl-item{border:1px solid #E9EDEF;border-radius:8px;padding:10px 12px;background:#fff}
+  .tpl-item:hover{background:#F5F6F6}
+  .tpl-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+  .tpl-name{flex:1;font-weight:500;color:#111B21;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tpl-actions{display:flex;gap:4px;flex-shrink:0}
+  .tpl-btn{border:none;background:transparent;cursor:pointer;padding:4px 8px;border-radius:4px;font-size:12px;font-family:inherit;color:#54656F}
+  .tpl-btn.use{background:#00A884;color:#fff;font-weight:500;padding:4px 12px}
+  .tpl-btn.use:hover{background:#06916F}
+  .tpl-btn.edit:hover{background:#E9EDEF;color:#111B21}
+  .tpl-btn.del{color:#C23B1E}
+  .tpl-btn.del:hover{background:#FEEAEA}
+  .tpl-body{font-size:12.5px;color:#54656F;line-height:1.4;white-space:pre-wrap;word-wrap:break-word;max-height:80px;overflow-y:auto}
+  .modal{max-width:520px}
 
   @media (max-width: 900px){
     .sidebar{width:100%}
@@ -1660,6 +1820,11 @@ app.get('/admin/inbox', (req, res) => {
       '<div class="chat-header" id="chatHeader"></div>'+
       '<div class="chat-labels-bar" id="chatLabels"></div>'+
       '<div id="chatBanner"></div>'+
+      '<div class="search-bar" id="searchBar">'+
+        '<input id="searchInChat" type="text" placeholder="Buscar en este chat…" autocomplete="off">'+
+        '<span class="count" id="searchCount"></span>'+
+        '<button class="close-search" id="closeSearch" title="Cerrar búsqueda">✕</button>'+
+      '</div>'+
       '<div class="messages" id="msgs"></div>'+
       '<button class="scroll-down" id="scrollDown">⌄</button>'+
       '<div class="emoji-picker" id="emojiPicker"></div>'+
@@ -1674,6 +1839,7 @@ app.get('/admin/inbox', (req, res) => {
       '<div class="reply-bar" id="replyBar"></div>'+
       '<div class="composer" id="composer">'+
         '<button class="icon-btn" id="btnEmoji" title="Emoji">😊</button>'+
+        '<button class="icon-btn" id="btnTpl" title="Plantillas de respuesta">⚡</button>'+
         '<button class="icon-btn" id="btnAttach" title="Adjuntar">📎</button>'+
         '<div class="text-wrap"><textarea id="inp" rows="1" placeholder="Escribí un mensaje"></textarea></div>'+
         '<button class="send-or-mic" id="btnSend" title="Mensaje de voz" aria-label="Enviar">🎤</button>'+
@@ -1692,6 +1858,7 @@ app.get('/admin/inbox', (req, res) => {
     });
     $('#btnAttach').addEventListener('click', toggleAttach);
     $('#btnEmoji').addEventListener('click', toggleEmoji);
+    $('#btnTpl').addEventListener('click', openTemplatesModal);
     $('#attImg').addEventListener('click', () => { $('#fileInpImg').click(); closeMenus(); });
     $('#attVid').addEventListener('click', () => { $('#fileInpVid').click(); closeMenus(); });
     $('#attDoc').addEventListener('click', () => { $('#fileInpDoc').click(); closeMenus(); });
@@ -1729,6 +1896,95 @@ app.get('/admin/inbox', (req, res) => {
     if (bar){ bar.classList.remove('open'); bar.innerHTML=''; }
   }
 
+  // --- Búsqueda dentro del chat ---
+  let _searchTimer = null;
+  function toggleSearchBar(){
+    const bar = $('#searchBar');
+    if (!bar) return;
+    bar.classList.toggle('open');
+    if (bar.classList.contains('open')) {
+      const inp = $('#searchInChat');
+      inp.value = '';
+      inp.focus();
+      $('#searchCount').textContent = '';
+      inp.addEventListener('input', onSearchInput);
+      inp.addEventListener('keydown', e => { if (e.key==='Escape') closeSearchBar(); });
+      $('#closeSearch').onclick = closeSearchBar;
+    } else {
+      closeSearchBar();
+    }
+  }
+  function closeSearchBar(){
+    const bar = $('#searchBar');
+    if (bar) bar.classList.remove('open');
+    clearSearchHighlights();
+    $('#searchCount').textContent = '';
+  }
+  function clearSearchHighlights(){
+    document.querySelectorAll('.msg.search-hit').forEach(el => el.classList.remove('search-hit'));
+    document.querySelectorAll('.msg mark').forEach(m => {
+      const text = m.textContent;
+      m.replaceWith(document.createTextNode(text));
+    });
+  }
+  function onSearchInput(e){
+    const q = e.target.value.trim();
+    clearTimeout(_searchTimer);
+    if (q.length < 2) {
+      clearSearchHighlights();
+      $('#searchCount').textContent = q.length === 1 ? 'Mín. 2 letras' : '';
+      return;
+    }
+    _searchTimer = setTimeout(() => doSearch(q), 220);
+  }
+  async function doSearch(q){
+    if (!state.activeTel) return;
+    try {
+      const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/search?q='+encodeURIComponent(q), { credentials:'same-origin' });
+      const { matches } = await r.json();
+      clearSearchHighlights();
+      $('#searchCount').textContent = matches.length + ' resultado' + (matches.length===1?'':'s');
+      if (!matches.length) return;
+      const ids = new Set(matches.map(m => m.id));
+      const re = new RegExp('('+q.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\\$&')+')', 'gi');
+      // Highlight + scroll to first match
+      let firstEl = null;
+      document.querySelectorAll('.msg').forEach(bub => {
+        if (!ids.has(parseInt(bub.dataset.mid, 10))) return;
+        bub.classList.add('search-hit');
+        if (!firstEl) firstEl = bub;
+        // Reemplazar text nodes con highlight
+        const walker = document.createTreeWalker(bub, NodeFilter.SHOW_TEXT, null);
+        const textNodes = [];
+        let n;
+        while (n = walker.nextNode()) {
+          if (n.parentElement.closest('.bubble-meta, audio, video, a.doc')) continue;
+          textNodes.push(n);
+        }
+        textNodes.forEach(tn => {
+          const text = tn.nodeValue;
+          if (!re.test(text)) return;
+          re.lastIndex = 0;
+          const frag = document.createDocumentFragment();
+          let last = 0;
+          let m;
+          while ((m = re.exec(text))) {
+            if (m.index > last) frag.appendChild(document.createTextNode(text.slice(last, m.index)));
+            const mark = document.createElement('mark');
+            mark.textContent = m[0];
+            frag.appendChild(mark);
+            last = re.lastIndex;
+          }
+          if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+          tn.replaceWith(frag);
+        });
+      });
+      if (firstEl) firstEl.scrollIntoView({ behavior:'smooth', block:'center' });
+    } catch (e) {
+      $('#searchCount').textContent = 'Error';
+    }
+  }
+
   function updateScrollDown(){
     const c = $('#msgs');
     const s = $('#scrollDown');
@@ -1756,6 +2012,7 @@ app.get('/admin/inbox', (req, res) => {
         '<div class="info-text"><div class="name">'+escapeHtml(name)+'</div><div class="sub">+'+escapeHtml(c.telefono)+' · '+escapeHtml(lastSeen)+'</div></div>'+
       '</div>'+
       '<div class="actions">'+
+        '<button class="ico" id="btnSearch" title="Buscar en este chat">🔍</button>'+
         '<button class="ico" id="btnToggleBot" title="'+(paused?'Reactivar bot':'Pausar bot y tomar control')+'">'+(paused?'🤖':'👤')+'</button>'+
         '<button class="ico" id="btnInfoToggle" title="Datos del contacto">ℹ️</button>'+
       '</div>';
@@ -1763,6 +2020,7 @@ app.get('/admin/inbox', (req, res) => {
     $('#openInfo').addEventListener('click', openInfo);
     $('#btnToggleBot').addEventListener('click', () => toggleBot(!paused));
     $('#btnInfoToggle').addEventListener('click', openInfo);
+    $('#btnSearch').addEventListener('click', toggleSearchBar);
 
     if (labelsBar) {
       const labelChips = (c.labels||[]).map(l =>
@@ -1934,6 +2192,127 @@ app.get('/admin/inbox', (req, res) => {
     );
   }
   $('#manageLabels').addEventListener('click', manageLabels);
+
+  // --- Plantillas de respuesta ---
+  async function openTemplatesModal(){
+    closeMenus();
+    let tpls = [];
+    try {
+      const r = await fetch('/admin/templates', { credentials:'same-origin' });
+      tpls = (await r.json()).templates || [];
+    } catch { toast('Error cargando plantillas', true); return; }
+    const items = tpls.map(t =>
+      '<div class="tpl-item" data-id="'+t.id+'">'+
+        '<div class="tpl-row">'+
+          '<div class="tpl-name">'+escapeHtml(t.name)+'</div>'+
+          '<div class="tpl-actions">'+
+            '<button class="tpl-btn use" data-use="'+t.id+'" title="Usar esta plantilla">Usar</button>'+
+            '<button class="tpl-btn edit" data-edit="'+t.id+'" title="Editar">✎</button>'+
+            '<button class="tpl-btn del" data-del="'+t.id+'" data-name="'+escapeHtml(t.name)+'" title="Eliminar">×</button>'+
+          '</div>'+
+        '</div>'+
+        '<div class="tpl-body">'+escapeHtml(t.body)+'</div>'+
+      '</div>'
+    ).join('') || '<p style="color:#667781">Aún no hay plantillas. Creá la primera ↓</p>';
+    showModal(
+      '<h3>Plantillas de respuesta</h3>'+
+      '<p>Hacé clic en "Usar" para insertar el texto en el composer.</p>'+
+      '<div id="tplList" style="max-height:380px;overflow-y:auto;margin-bottom:14px;display:flex;flex-direction:column;gap:6px">'+items+'</div>'+
+      '<div class="btns"><button class="btn secondary" onclick="_closeModal(null)">Cerrar</button><button class="btn primary" id="newTpl">+ Nueva plantilla</button></div>',
+      m => {
+        m.querySelector('#newTpl').onclick = () => { closeModal(null); createTemplatePrompt(); };
+        m.querySelectorAll('[data-use]').forEach(b => b.onclick = () => {
+          const t = tpls.find(x => x.id == b.dataset.use);
+          if (!t) return;
+          insertTextAtCursor(t.body);
+          closeModal(null);
+          toast('Plantilla "'+t.name+'" insertada');
+        });
+        m.querySelectorAll('[data-edit]').forEach(b => b.onclick = async () => {
+          const t = tpls.find(x => x.id == b.dataset.edit);
+          if (!t) return;
+          closeModal(null);
+          editTemplatePrompt(t);
+        });
+        m.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+          const id = b.dataset.del;
+          const nm = b.dataset.name;
+          closeModal(null);
+          if (!await confirmModal('Eliminar plantilla', '¿Eliminar "'+nm+'"?')) return;
+          await fetch('/admin/templates/'+id, { method:'DELETE', credentials:'same-origin', headers: csrfHeader() });
+          toast('Plantilla eliminada');
+        });
+      }
+    );
+  }
+
+  function insertTextAtCursor(text){
+    const inp = $('#inp');
+    if (!inp) return;
+    const start = inp.selectionStart ?? inp.value.length;
+    const end = inp.selectionEnd ?? inp.value.length;
+    inp.value = inp.value.slice(0, start) + text + inp.value.slice(end);
+    inp.focus();
+    const pos = start + text.length;
+    inp.selectionStart = inp.selectionEnd = pos;
+    inp.style.height = 'auto';
+    inp.style.height = Math.min(140, inp.scrollHeight) + 'px';
+    // Trigger input event para actualizar el botón send/mic
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  async function createTemplatePrompt(){
+    const html =
+      '<h3>Nueva plantilla</h3>'+
+      '<input id="tplName" type="text" placeholder="Nombre (ej: Saludo inicial)" maxlength="80">'+
+      '<textarea id="tplBody" placeholder="Texto de la plantilla…" rows="6" style="width:100%;padding:10px 12px;border:1px solid #DFE5E7;border-radius:6px;font-size:14px;font-family:inherit;outline:none;resize:vertical;margin-bottom:10px;color:#111B21"></textarea>'+
+      '<div class="err" id="tplErr"></div>'+
+      '<div class="btns"><button class="btn secondary" onclick="_closeModal(null)">Cancelar</button><button class="btn primary" id="saveTpl">Guardar</button></div>';
+    showModal(html, m => {
+      m.querySelector('#tplName').focus();
+      m.querySelector('#saveTpl').onclick = async () => {
+        const name = m.querySelector('#tplName').value.trim();
+        const body = m.querySelector('#tplBody').value.trim();
+        const err = m.querySelector('#tplErr');
+        if (!name || !body) { err.textContent='Nombre y texto requeridos'; err.classList.add('show'); return; }
+        const r = await fetch('/admin/templates', {
+          method:'POST', credentials:'same-origin',
+          headers:{...csrfHeader(),'Content-Type':'application/json'},
+          body: JSON.stringify({ name, body })
+        });
+        if (!r.ok) { err.textContent='Error guardando'; err.classList.add('show'); return; }
+        closeModal(null);
+        toast('Plantilla "'+name+'" creada');
+        openTemplatesModal();
+      };
+    });
+  }
+
+  function editTemplatePrompt(tpl){
+    const html =
+      '<h3>Editar plantilla</h3>'+
+      '<input id="tplName" type="text" maxlength="80" value="'+escapeHtml(tpl.name)+'">'+
+      '<textarea id="tplBody" rows="6" style="width:100%;padding:10px 12px;border:1px solid #DFE5E7;border-radius:6px;font-size:14px;font-family:inherit;outline:none;resize:vertical;margin-bottom:10px;color:#111B21">'+escapeHtml(tpl.body)+'</textarea>'+
+      '<div class="err" id="tplErr"></div>'+
+      '<div class="btns"><button class="btn secondary" onclick="_closeModal(null)">Cancelar</button><button class="btn primary" id="saveTpl">Guardar</button></div>';
+    showModal(html, m => {
+      m.querySelector('#saveTpl').onclick = async () => {
+        const name = m.querySelector('#tplName').value.trim();
+        const body = m.querySelector('#tplBody').value.trim();
+        const err = m.querySelector('#tplErr');
+        if (!name || !body) { err.textContent='Nombre y texto requeridos'; err.classList.add('show'); return; }
+        const r = await fetch('/admin/templates/'+tpl.id, {
+          method:'PUT', credentials:'same-origin',
+          headers:{...csrfHeader(),'Content-Type':'application/json'},
+          body: JSON.stringify({ name, body })
+        });
+        if (!r.ok) { err.textContent='Error guardando'; err.classList.add('show'); return; }
+        closeModal(null);
+        toast('Plantilla actualizada');
+        openTemplatesModal();
+      };
+    });
+  }
 
   async function sendMsg(){
     const inp = $('#inp');
@@ -2162,7 +2541,11 @@ app.post('/consulta', (req, res) => {
 });
 
 // --- WhatsApp bot (Cloud API directo, sin Kapso) ---
-const processedMessages = new Set();
+// Dedup persistente: usa tabla processed_messages (sobrevive restarts y multi-instancia)
+const _checkProcessed = db.prepare('SELECT 1 FROM processed_messages WHERE wa_id = ?');
+const _markProcessed = db.prepare('INSERT OR IGNORE INTO processed_messages (wa_id) VALUES (?)');
+function isProcessed(waId) { return !!_checkProcessed.get(waId); }
+function markProcessed(waId) { try { _markProcessed.run(waId); } catch {} }
 const debugLog = [];
 function logDebug(event) {
   debugLog.push({ ts: new Date().toISOString(), ...event });
@@ -2375,12 +2758,8 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
     logDebug({ kind: 'webhook_in', hasMsg: !!msg, msgType: msg?.type, from: msg?.from });
     if (!msg) return;
 
-    if (processedMessages.has(msg.id)) { logDebug({ kind: 'dedup_skip', id: msg.id }); return; }
-    processedMessages.add(msg.id);
-    if (processedMessages.size > 500) {
-      const first = processedMessages.values().next().value;
-      processedMessages.delete(first);
-    }
+    if (isProcessed(msg.id)) { logDebug({ kind: 'dedup_skip', id: msg.id }); return; }
+    markProcessed(msg.id);
 
     const from = msg.from;
     console.log('[WA] msg from', maskTel(from), 'type', msg.type);
