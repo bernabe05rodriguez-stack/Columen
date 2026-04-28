@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
 
 const app = express();
 const PORT = process.env.PORT || 80;
@@ -24,6 +25,13 @@ const PUBLIC_URL = process.env.PUBLIC_URL || 'https://redhawk-columen.bm6z1s.eas
 if (!APP_SECRET) console.error('[WA] APP_SECRET not set — webhook signature verification will FAIL');
 if (!ADMIN_PASS_HASH && !ADMIN_PASS) console.error('[auth] No ADMIN_PASS_HASH or ADMIN_PASS configured — login disabled');
 if (!ADMIN_PASS_HASH && ADMIN_PASS) console.warn('[auth] Using plaintext ADMIN_PASS fallback — set ADMIN_PASS_HASH (bcrypt) and remove ADMIN_PASS ASAP');
+
+// Anonimiza teléfono para logs en producción (mantiene 4 últimos dígitos)
+function maskTel(tel) {
+  if (!tel || typeof tel !== 'string') return '?';
+  if (!IS_PROD) return tel;
+  return tel.length > 4 ? '+...' + tel.slice(-4) : tel;
+}
 
 // Database - use /data if exists (Docker volume), fallback to ./data
 const fs = require('fs');
@@ -200,6 +208,33 @@ app.use(express.json({
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+// --- Security headers (helmet) ---
+// CSP afinado: admin tiene mucho inline JS/CSS; emojis base64; Google Fonts; media de Meta CDN
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      'default-src': ["'self'"],
+      'script-src': ["'self'", "'unsafe-inline'"],
+      'script-src-attr': ["'unsafe-inline'"],
+      'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+      'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
+      'img-src': ["'self'", 'data:', 'https:', 'blob:'],
+      'media-src': ["'self'", 'blob:', 'https:'],
+      'connect-src': ["'self'", 'https://graph.facebook.com'],
+      'frame-ancestors': ["'none'"],
+      'base-uri': ["'self'"],
+      'form-action': ["'self'"],
+      'object-src': ["'none'"],
+      'upgrade-insecure-requests': [],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // permite que admin/media (Meta CDN) se embeba
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  hsts: IS_PROD ? { maxAge: 31536000, includeSubDomains: true } : false,
+}));
+
 // --- Auth helpers ---
 function createSession() {
   const token = crypto.randomBytes(32).toString('hex');
@@ -242,6 +277,43 @@ function verifyMetaSignature(req, res, next) {
   next();
 }
 
+// --- CSRF protection (double-submit cookie) ---
+// La cookie csrf NO es httpOnly (el JS la lee y la envía como header X-CSRF-Token).
+// SameSite=strict garantiza que solo se envíe en navegación same-site.
+function ensureCsrfToken(req, res) {
+  let token = req.cookies && req.cookies['csrf'];
+  if (!token) {
+    token = crypto.randomBytes(32).toString('hex');
+    res.cookie('csrf', token, {
+      httpOnly: false,
+      sameSite: 'strict',
+      secure: IS_PROD,
+      maxAge: 86400000,
+      path: '/',
+    });
+    if (req.cookies) req.cookies['csrf'] = token;
+  }
+  return token;
+}
+function requireCsrf(req, res, next) {
+  const cookieToken = req.cookies && req.cookies['csrf'];
+  const headerToken = req.headers['x-csrf-token'] || (req.body && req.body._csrf);
+  if (!cookieToken || !headerToken) return res.status(403).json({ error: 'csrf_missing' });
+  let ok = false;
+  try {
+    const a = Buffer.from(cookieToken);
+    const b = Buffer.from(headerToken);
+    ok = a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch { ok = false; }
+  if (!ok) return res.status(403).json({ error: 'csrf_invalid' });
+  next();
+}
+// Generar/refrescar token al cargar cualquier GET de /admin
+app.use((req, res, next) => {
+  if (req.method === 'GET' && req.path.startsWith('/admin')) ensureCsrfToken(req, res);
+  next();
+});
+
 // --- Login rate limiter (anti brute-force) ---
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -249,23 +321,6 @@ const loginLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: 'Demasiados intentos. Probá de nuevo en 15 minutos.',
-});
-
-// --- Webhook: receives data from Kapso ---
-app.post('/api/webhook', (req, res) => {
-  const data = req.body;
-  console.log('Webhook received:', JSON.stringify(data));
-  const stmt = db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?, ?, ?, ?, ?, ?)');
-  stmt.run(
-    data.telefono || '',
-    data.area || '',
-    data.nombre || '',
-    data.dni || '',
-    data.email || '',
-    data.consulta || ''
-  );
-  snapshotDB('consulta');
-  res.json({ status: 'ok' });
 });
 
 // --- Admin login page ---
@@ -816,7 +871,7 @@ app.get('/admin/labels', (req, res) => {
   res.json({ labels: db.prepare('SELECT id, name, color FROM labels ORDER BY name').all() });
 });
 
-app.post('/admin/labels', (req, res) => {
+app.post('/admin/labels', requireCsrf, (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const name = (req.body?.name || '').trim();
   const color = (req.body?.color || '#8a6d2b').trim();
@@ -830,7 +885,7 @@ app.post('/admin/labels', (req, res) => {
   }
 });
 
-app.delete('/admin/labels/:id', (req, res) => {
+app.delete('/admin/labels/:id', requireCsrf, (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const id = parseInt(req.params.id, 10);
   db.prepare('DELETE FROM conversation_labels WHERE label_id = ?').run(id);
@@ -838,7 +893,7 @@ app.delete('/admin/labels/:id', (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/admin/inbox/:tel/labels/:labelId', (req, res) => {
+app.post('/admin/inbox/:tel/labels/:labelId', requireCsrf, (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const tel = req.params.tel;
   const labelId = parseInt(req.params.labelId, 10);
@@ -846,7 +901,7 @@ app.post('/admin/inbox/:tel/labels/:labelId', (req, res) => {
   res.json({ ok: true, labels: labelsForTel(tel) });
 });
 
-app.delete('/admin/inbox/:tel/labels/:labelId', (req, res) => {
+app.delete('/admin/inbox/:tel/labels/:labelId', requireCsrf, (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const tel = req.params.tel;
   const labelId = parseInt(req.params.labelId, 10);
@@ -874,7 +929,7 @@ app.get('/admin/inbox/:tel/messages', (req, res) => {
 });
 
 // Send image (base64 JSON body)
-app.post('/admin/inbox/:tel/send-image', express.json({ limit: '16mb' }), async (req, res) => {
+app.post('/admin/inbox/:tel/send-image', requireCsrf, express.json({ limit: '16mb' }), async (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const tel = req.params.tel;
   const { filename, mime, data, caption } = req.body || {};
@@ -952,13 +1007,13 @@ app.get('/admin/media/:id', async (req, res) => {
   }
 });
 
-app.post('/admin/inbox/:tel/read', (req, res) => {
+app.post('/admin/inbox/:tel/read', requireCsrf, (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   db.prepare('UPDATE conversations SET unread = 0 WHERE telefono = ?').run(req.params.tel);
   res.json({ ok: true });
 });
 
-app.post('/admin/inbox/:tel/bot', (req, res) => {
+app.post('/admin/inbox/:tel/bot', requireCsrf, (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const pausedInt = req.body?.paused ? 1 : 0;
   const exists = db.prepare('SELECT telefono FROM conversations WHERE telefono = ?').get(req.params.tel);
@@ -971,7 +1026,7 @@ app.post('/admin/inbox/:tel/bot', (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/admin/inbox/:tel/send', async (req, res) => {
+app.post('/admin/inbox/:tel/send', requireCsrf, async (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const tel = req.params.tel;
   const body = (req.body?.body || '').trim();
@@ -1377,6 +1432,10 @@ app.get('/admin/inbox', (req, res) => {
   const $ = sel => document.querySelector(sel);
   function initials(s){ if(!s) return '?'; const p=s.trim().split(/\\s+/); return ((p[0]?.[0]||'')+(p[1]?.[0]||'')).toUpperCase() || '?'; }
   function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function csrfHeader(){
+    const m = document.cookie.match(/(?:^|; )csrf=([^;]+)/);
+    return m ? { 'X-CSRF-Token': decodeURIComponent(m[1]) } : {};
+  }
   function pad(n){ return String(n).padStart(2,'0'); }
   function parseDate(iso){ return iso ? new Date(iso.replace(' ','T')) : null; }
   function sameDay(a,b){ return a && b && a.toDateString()===b.toDateString(); }
@@ -1492,7 +1551,7 @@ app.get('/admin/inbox', (req, res) => {
     $('#layout').classList.add('has-chat');
     document.querySelectorAll('.conv').forEach(n => n.classList.toggle('active', n.dataset.tel===tel));
     await fetchMessages(true);
-    try { await fetch('/admin/inbox/'+encodeURIComponent(tel)+'/read', { method:'POST', credentials:'same-origin' }); } catch {}
+    try { await fetch('/admin/inbox/'+encodeURIComponent(tel)+'/read', { method:'POST', credentials:'same-origin', headers: csrfHeader() }); } catch {}
     loadConvs();
   }
 
@@ -1782,7 +1841,7 @@ app.get('/admin/inbox', (req, res) => {
     if (!state.activeTel) return;
     await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/bot', {
       method:'POST', credentials:'same-origin',
-      headers:{'Content-Type':'application/json'}, body: JSON.stringify({paused})
+      headers:{...csrfHeader(),'Content-Type':'application/json'}, body: JSON.stringify({paused})
     });
     fetchMessages(false);
     loadConvs();
@@ -1813,7 +1872,7 @@ app.get('/admin/inbox', (req, res) => {
 
   async function addLabel(id){
     closeLabelMenu();
-    const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/labels/'+id, { method:'POST', credentials:'same-origin' });
+    const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/labels/'+id, { method:'POST', credentials:'same-origin', headers: csrfHeader() });
     const j = await r.json();
     if (state.conv) state.conv.labels = j.labels;
     updateChatHeader();
@@ -1821,7 +1880,7 @@ app.get('/admin/inbox', (req, res) => {
   }
 
   async function removeLabel(id){
-    const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/labels/'+id, { method:'DELETE', credentials:'same-origin' });
+    const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/labels/'+id, { method:'DELETE', credentials:'same-origin', headers: csrfHeader() });
     const j = await r.json();
     if (state.conv) state.conv.labels = j.labels;
     updateChatHeader();
@@ -1836,7 +1895,7 @@ app.get('/admin/inbox', (req, res) => {
     if (!color) return;
     const r = await fetch('/admin/labels', {
       method:'POST', credentials:'same-origin',
-      headers:{'Content-Type':'application/json'}, body: JSON.stringify({name:name.trim(), color})
+      headers:{...csrfHeader(),'Content-Type':'application/json'}, body: JSON.stringify({name:name.trim(), color})
     });
     if (!r.ok) { toast('Error creando etiqueta', true); return; }
     const j = await r.json();
@@ -1866,7 +1925,7 @@ app.get('/admin/inbox', (req, res) => {
           const nm = b.dataset.name;
           closeModal(null);
           if (!await confirmModal('Eliminar etiqueta', '"'+nm+'" se quitará de todas las conversaciones.')) return;
-          await fetch('/admin/labels/'+id, { method:'DELETE', credentials:'same-origin' });
+          await fetch('/admin/labels/'+id, { method:'DELETE', credentials:'same-origin', headers: csrfHeader() });
           toast('Etiqueta "'+nm+'" eliminada');
           loadConvs();
         });
@@ -1889,7 +1948,7 @@ app.get('/admin/inbox', (req, res) => {
     try {
       const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/send', {
         method:'POST', credentials:'same-origin',
-        headers:{'Content-Type':'application/json'}, body: JSON.stringify({ body })
+        headers:{...csrfHeader(),'Content-Type':'application/json'}, body: JSON.stringify({ body })
       });
       if (!r.ok) {
         const j = await r.json().catch(()=>({}));
@@ -1940,7 +1999,7 @@ app.get('/admin/inbox', (req, res) => {
       });
       const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/send-image', {
         method:'POST', credentials:'same-origin',
-        headers:{'Content-Type':'application/json'},
+        headers:{...csrfHeader(),'Content-Type':'application/json'},
         body: JSON.stringify({ filename: file.name, mime: file.type, data: base64, caption })
       });
       if (!r.ok) {
@@ -2275,9 +2334,9 @@ async function handleTextInFlow(from, text) {
   }
 }
 
-// Debug endpoint - muestra ultimos eventos del bot
+// Debug endpoint - muestra ultimos eventos del bot (admin only)
 app.get('/bot-debug', (req, res) => {
-  if (req.query.key !== 'columen-debug-2026') return res.status(403).json({ error: 'forbidden' });
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const states = db.prepare('SELECT * FROM bot_state ORDER BY updated_at DESC LIMIT 20').all();
   res.json({ events: debugLog.slice().reverse(), states });
 });
@@ -2323,7 +2382,7 @@ app.post('/webhook', verifyMetaSignature, async (req, res) => {
     }
 
     const from = msg.from;
-    console.log('[WA] msg from', from, 'type', msg.type);
+    console.log('[WA] msg from', maskTel(from), 'type', msg.type);
 
     if (msg.type === 'interactive' && msg.interactive?.type === 'button_reply') {
       const br = msg.interactive.button_reply;
@@ -2370,12 +2429,39 @@ app.get('/legales/aviso-legal', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'legales', 'aviso-legal.html'));
 });
 
+// --- Health check (público, para EasyPanel/Cloudflare) ---
+app.get('/healthz', (req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ ok: true, db: 'ok', uptime: Math.round(process.uptime()) });
+  } catch (e) {
+    res.status(503).json({ ok: false, db: 'error', error: e.message });
+  }
+});
+
 // --- Serve landing page ---
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Columen running on port ${PORT}`);
 });
+
+// Graceful shutdown — drena conexiones, cierra DB, exit limpio
+let shuttingDown = false;
+function shutdown(sig) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] ${sig} recibido, cerrando…`);
+  const force = setTimeout(() => { console.error('[shutdown] timeout, forzando exit'); process.exit(1); }, 10000);
+  server.close(() => {
+    try { db.close(); } catch {}
+    clearTimeout(force);
+    console.log('[shutdown] cerrado limpio');
+    process.exit(0);
+  });
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 function escapeHtml(str) {
   if (!str) return '';
