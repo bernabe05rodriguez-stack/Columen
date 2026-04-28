@@ -213,15 +213,19 @@
     .cta-box p{font-size:15px;margin-bottom:24px}
     .cta-box .btn-wa{width:100%;justify-content:center;font-size:15px;padding:14px 24px}
     .cta{padding:56px 0}
-    .foot{flex-direction:column;text-align:center;gap:14px}
-    .foot-info{text-align:center;font-size:12px}
+    .foot{flex-direction:column;text-align:center;gap:14px;width:100%;align-items:stretch}
+    .foot .logo-wrap{justify-content:center}
+    .foot-info{text-align:center;font-size:12px;max-width:100%;width:100%}
+    .foot-info > div{max-width:100%;word-wrap:break-word;overflow-wrap:break-word;white-space:normal}
+    .foot-addr .addr-sep{display:none}
+    .foot-addr .addr-line{display:block}
     .nav{height:78px;gap:10px}
     .logo-wrap .logo-d{display:none}
     .logo-wrap .logo-m{display:block;height:50px;width:auto;max-width:220px;flex-shrink:0}
     .nav-cta{font-size:12.5px;padding:8px 14px;gap:6px;white-space:nowrap}
     .nav-cta svg{width:13px;height:13px}
     .menu-btn{padding:6px}
-    .foot .logo-wrap svg{height:64px;max-width:280px}
+    .foot .logo-wrap svg{height:88px;max-width:300px}
     .team-note{font-size:14px}
     .how-note{font-size:12px}
     .how-intro{font-size:14px}
@@ -506,7 +510,7 @@
   <div class="container foot">
     <a href="#" class="logo-wrap" aria-label="Columen — Inicio"><svg viewBox="5 0 404 170" xmlns="http://www.w3.org/2000/svg"><use href="#logo"/></svg></a>
     <div class="foot-info">
-      <div>Catamarca 170, Planta Baja, oficinas 8 y 10 · Ciudad de Mendoza</div>
+      <div class="foot-addr"><span class="addr-line">Catamarca 170, Planta Baja, oficinas 8 y 10</span><span class="addr-sep"> · </span><span class="addr-line">Ciudad de Mendoza</span></div>
       <div class="foot-legal"><a href="/legales/privacidad">Política de privacidad</a> · <a href="/legales/aviso-legal">Aviso legal</a></div>
       <div>© 2026 Columen Legal &amp; Notarial</div>
     </div>
