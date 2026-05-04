@@ -1178,7 +1178,7 @@ app.post('/admin/inbox/:tel/send-image', requireCsrf, express.json({ limit: '16m
     const upJson = await up.json();
     if (!up.ok || !upJson.id) {
       console.error('[WA] media upload error', JSON.stringify(upJson));
-      return res.status(502).json({ error: 'upload failed', detail: upJson.error?.message || 'unknown' });
+      return res.status(400).json({ error: 'upload failed', detail: upJson.error?.message || 'unknown' });
     }
     const mediaId = upJson.id;
     const isImage = mime.startsWith('image/');
@@ -1196,7 +1196,7 @@ app.post('/admin/inbox/:tel/send-image', requireCsrf, express.json({ limit: '16m
     if (exists) db.prepare('UPDATE conversations SET bot_paused = 1 WHERE telefono = ?').run(tel);
     else db.prepare("INSERT INTO conversations (telefono, last_at, bot_paused) VALUES (?, datetime('now','localtime'), 1)").run(tel);
     const result = await waSend(payload);
-    if (result?.error) return res.status(502).json({ error: result.error.message || 'send failed' });
+    if (result?.error) return res.status(400).json({ error: result.error.message || 'send failed' });
     // Update last stored message to include mime (waSend records with null mime)
     db.prepare("UPDATE messages SET media_mime = ? WHERE telefono = ? AND direction = 'out' AND media_id = ?").run(mime, tel, mediaId);
     res.json({ ok: true });
@@ -1220,12 +1220,12 @@ app.get('/admin/media/:id', async (req, res) => {
         headers: { Authorization: `Bearer ${WA_TOKEN}` },
       });
       const j = await r.json();
-      if (!r.ok || !j.url) return res.status(502).send('meta meta error');
+      if (!r.ok || !j.url) return res.status(400).send('meta meta error');
       meta = { url: j.url, mime: j.mime_type, ts: now };
       mediaUrlCache.set(id, meta);
     }
     const r2 = await fetch(meta.url, { headers: { Authorization: `Bearer ${WA_TOKEN}` } });
-    if (!r2.ok) return res.status(502).send('meta cdn error');
+    if (!r2.ok) return res.status(400).send('meta cdn error');
     res.setHeader('Content-Type', meta.mime || r2.headers.get('content-type') || 'application/octet-stream');
     res.setHeader('Cache-Control', 'private, max-age=3600');
     const buf = Buffer.from(await r2.arrayBuffer());
@@ -1267,7 +1267,7 @@ app.post('/admin/inbox/:tel/send', requireCsrf, async (req, res) => {
     db.prepare("INSERT INTO conversations (telefono, last_at, bot_paused) VALUES (?, datetime('now','localtime'), 1)").run(tel);
   }
   const result = await sendText(tel, body);
-  if (result?.error) return res.status(502).json({ error: 'wa_error', detail: result.error.message || 'Error de WhatsApp', raw: result.error });
+  if (result?.error) return res.status(400).json({ error: 'wa_error', detail: result.error.message || 'Error de WhatsApp', raw: result.error });
   res.json({ ok: true });
 });
 
@@ -1284,7 +1284,7 @@ app.post('/admin/inbox/:tel/send-template', requireCsrf, async (req, res) => {
   }
   const result = await sendTemplate(tel);
   if (result?.error) {
-    return res.status(502).json({
+    return res.status(400).json({
       error: 'wa_error',
       detail: result.error.message || 'Error de WhatsApp',
       hint: 'Verificá que la plantilla esté APROBADA en business.facebook.com (las en revisión rebotan).',
