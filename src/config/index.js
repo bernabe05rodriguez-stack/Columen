@@ -22,6 +22,11 @@ const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID || '';
 const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'columen-verify-2026';
 const APP_SECRET = process.env.APP_SECRET || '';
 
+// Plantilla aprobada para reabrir ventana 24hs (UTILITY, sin variables)
+const RECONTACT_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_RECONTACT_NAME || 'columen';
+const RECONTACT_TEMPLATE_LANG = process.env.WHATSAPP_TEMPLATE_RECONTACT_LANG || 'es_AR';
+const RECONTACT_TEMPLATE_PREVIEW = process.env.WHATSAPP_TEMPLATE_RECONTACT_PREVIEW || 'Buen día me comunico de Columen';
+
 // URLs
 const PUBLIC_URL = process.env.PUBLIC_URL || 'https://redhawk-columen.bm6z1s.easypanel.host';
 
@@ -43,6 +48,7 @@ module.exports = {
   NODE_ENV, IS_PROD, PORT,
   ADMIN_USER, ADMIN_PASS, ADMIN_PASS_HASH, SESSION_SECRET, RATE_LIMIT_LOGIN_MAX,
   WA_TOKEN, WA_PHONE_ID, WA_VERIFY_TOKEN, APP_SECRET,
+  RECONTACT_TEMPLATE_NAME, RECONTACT_TEMPLATE_LANG, RECONTACT_TEMPLATE_PREVIEW,
   PUBLIC_URL,
   BACKUP_OFFSITE_TOKEN, BACKUP_OFFSITE_REPO, BACKUP_OFFSITE_BRANCH,
   logConfigWarnings,

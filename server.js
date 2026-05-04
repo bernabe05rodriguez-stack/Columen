@@ -13,6 +13,7 @@ const {
   NODE_ENV, IS_PROD, PORT,
   ADMIN_USER, ADMIN_PASS, ADMIN_PASS_HASH, SESSION_SECRET,
   WA_TOKEN, WA_PHONE_ID, WA_VERIFY_TOKEN, APP_SECRET,
+  RECONTACT_TEMPLATE_NAME, RECONTACT_TEMPLATE_LANG, RECONTACT_TEMPLATE_PREVIEW,
   PUBLIC_URL,
   BACKUP_OFFSITE_TOKEN, BACKUP_OFFSITE_REPO, BACKUP_OFFSITE_BRANCH,
 } = config;
@@ -1127,7 +1128,12 @@ app.get('/admin/inbox/:tel/messages', (req, res) => {
   } else {
     canSend = false;
   }
-  res.json({ messages, conversation: { ...conv, nombre, labels }, canSend });
+  res.json({
+    messages,
+    conversation: { ...conv, nombre, labels },
+    canSend,
+    recontactTemplate: { name: RECONTACT_TEMPLATE_NAME, lang: RECONTACT_TEMPLATE_LANG, preview: RECONTACT_TEMPLATE_PREVIEW },
+  });
 });
 
 // Búsqueda dentro de un chat
@@ -1260,6 +1266,29 @@ app.post('/admin/inbox/:tel/send', requireCsrf, async (req, res) => {
   res.json({ ok: true });
 });
 
+// Envía la plantilla de re-contacto para reabrir la ventana 24hs cuando expiró.
+// Auto-pausa el bot. Body opcional: {} (usa defaults de env vars).
+app.post('/admin/inbox/:tel/send-template', requireCsrf, async (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const tel = req.params.tel;
+  const exists = db.prepare('SELECT telefono FROM conversations WHERE telefono = ?').get(tel);
+  if (exists) {
+    db.prepare('UPDATE conversations SET bot_paused = 1 WHERE telefono = ?').run(tel);
+  } else {
+    db.prepare("INSERT INTO conversations (telefono, last_at, bot_paused) VALUES (?, datetime('now','localtime'), 1)").run(tel);
+  }
+  const result = await sendTemplate(tel);
+  if (result?.error) {
+    return res.status(502).json({
+      error: 'wa_error',
+      detail: result.error.message || 'Error de WhatsApp',
+      hint: 'Verificá que la plantilla esté APROBADA en business.facebook.com (las en revisión rebotan).',
+      raw: result.error,
+    });
+  }
+  res.json({ ok: true, name: RECONTACT_TEMPLATE_NAME, lang: RECONTACT_TEMPLATE_LANG, preview: RECONTACT_TEMPLATE_PREVIEW });
+});
+
 app.get('/admin/inbox', (req, res) => {
   if (!isAuthenticated(req)) return res.redirect('/admin/login');
   res.send(`<!DOCTYPE html>
@@ -1356,8 +1385,12 @@ app.get('/admin/inbox', (req, res) => {
   .chat-header .ico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#54656F;background:transparent;border:none;font-size:18px;flex-shrink:0}
   .chat-header .ico:hover{background:#E9EDEF}
 
-  .chat-sub{background:#FFF8DC;border-bottom:1px solid #F0E6B6;padding:8px 16px;font-size:13px;color:#8A6D00;display:flex;align-items:center;gap:8px;flex-shrink:0}
+  .chat-sub{background:#FFF8DC;border-bottom:1px solid #F0E6B6;padding:8px 16px;font-size:13px;color:#8A6D00;display:flex;align-items:center;gap:10px;flex-shrink:0;flex-wrap:wrap}
   .chat-sub.err{background:#FEEAEA;border-color:#F5C6CB;color:#721C24}
+  .btn-recontact{background:#00A884;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12.5px;font-weight:600;cursor:pointer;transition:background .15s,transform .1s;flex-shrink:0;font-family:inherit}
+  .btn-recontact:hover{background:#06876B}
+  .btn-recontact:active{transform:scale(.97)}
+  .btn-recontact:disabled{background:#9DAEB7;cursor:not-allowed}
   .chat-labels-bar{background:#F0F2F5;padding:6px 16px;border-top:1px solid #E9EDEF;border-left:1px solid #E9EDEF;display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;color:#54656F;flex-shrink:0}
   .chat-labels-bar .chip{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;color:#fff;font-size:11px;font-weight:500}
   .chat-labels-bar .chip .x{cursor:pointer;opacity:.75;font-size:13px;line-height:1}
@@ -1806,9 +1839,10 @@ app.get('/admin/inbox', (req, res) => {
     try {
       const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/messages', { credentials:'same-origin' });
       if (!r.ok) return;
-      const { messages, conversation, canSend } = await r.json();
+      const { messages, conversation, canSend, recontactTemplate } = await r.json();
       state.conv = conversation;
       state.canSend = canSend;
+      state.recontactTemplate = recontactTemplate || null;
       state.messagesCache = messages;
       if (state.shellTel !== state.activeTel) {
         renderShell();
@@ -2117,9 +2151,23 @@ app.get('/admin/inbox', (req, res) => {
     }
 
     if (banner) {
-      banner.innerHTML = !state.canSend
-        ? '<div class="chat-sub">⏰ Fuera de la ventana de 24 hs de WhatsApp. Esperá a que el cliente escriba primero.</div>'
-        : '';
+      if (!state.canSend) {
+        const tpl = state.recontactTemplate;
+        const hasTpl = !!(tpl && tpl.name);
+        banner.innerHTML =
+          '<div class="chat-sub">' +
+            '<span style="flex:1">⏰ Fuera de la ventana de 24 hs de WhatsApp. ' +
+            (hasTpl ? 'Reactivá la conversación enviando la plantilla aprobada.' : 'Esperá a que el cliente escriba primero.') +
+            '</span>' +
+            (hasTpl ? '<button class="btn-recontact" id="btnRecontact">Reactivar con plantilla</button>' : '') +
+          '</div>';
+        if (hasTpl) {
+          const btnR = document.getElementById('btnRecontact');
+          if (btnR) btnR.addEventListener('click', sendRecontactTemplate);
+        }
+      } else {
+        banner.innerHTML = '';
+      }
     }
     const inp = $('#inp'); const btn = $('#btnSend'); const att = $('#btnAttach'); const emo = $('#btnEmoji');
     if (inp && btn && att && emo) {
@@ -2432,6 +2480,36 @@ app.get('/admin/inbox', (req, res) => {
       inp.focus();
     }
   }
+  async function sendRecontactTemplate(){
+    if (!state.activeTel || !state.recontactTemplate) return;
+    const tpl = state.recontactTemplate;
+    const ok = await confirmModal(
+      'Reactivar conversación',
+      'Se enviará la plantilla "'+tpl.name+'" ('+tpl.lang+') al cliente:\\n\\n"'+tpl.preview+'"\\n\\nEsto reabre la ventana de 24 hs cuando el cliente responda.'
+    );
+    if (!ok) return;
+    const btnR = document.getElementById('btnRecontact');
+    if (btnR) { btnR.disabled = true; btnR.textContent = 'Enviando…'; }
+    try {
+      const r = await fetch('/admin/inbox/'+encodeURIComponent(state.activeTel)+'/send-template', {
+        method:'POST', credentials:'same-origin',
+        headers:{...csrfHeader(),'Content-Type':'application/json'},
+        body: '{}'
+      });
+      const j = await r.json().catch(()=>({}));
+      if (!r.ok) {
+        toast((j.detail || 'Error de WhatsApp') + (j.hint ? ' — '+j.hint : ''), true);
+      } else {
+        toast('Plantilla enviada');
+        await fetchMessages(true);
+        loadConvs();
+      }
+    } catch (e) {
+      toast('Error de red', true);
+    } finally {
+      if (btnR) { btnR.disabled = false; btnR.textContent = 'Reactivar con plantilla'; }
+    }
+  }
   function closeChat(){
     state.activeTel = null;
     state.shellTel = null;
@@ -2664,6 +2742,9 @@ function outboundBodyFor(payload) {
     const btns = (payload.interactive?.action?.buttons || []).map(b => `[${b.reply?.title}]`).join(' ');
     return btns ? `${main}\n${btns}` : main;
   }
+  if (payload.type === 'template') {
+    return RECONTACT_TEMPLATE_PREVIEW;
+  }
   return `[${payload.type}]`;
 }
 
@@ -2731,6 +2812,21 @@ function sendText(to, body) {
     to,
     type: 'text',
     text: { body },
+  });
+}
+
+// Envía la plantilla aprobada de re-contacto (UTILITY, sin variables).
+// Reabre la ventana de 24hs cuando el cliente responde.
+function sendTemplate(to, name = RECONTACT_TEMPLATE_NAME, language = RECONTACT_TEMPLATE_LANG) {
+  return waSend({
+    messaging_product: 'whatsapp',
+    recipient_type: 'individual',
+    to,
+    type: 'template',
+    template: {
+      name,
+      language: { code: language },
+    },
   });
 }
 
