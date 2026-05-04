@@ -6,6 +6,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const ExcelJS = require('exceljs');
 
 // Config centralizada — único lugar que lee process.env.*
 const config = require('./src/config');
@@ -487,6 +488,82 @@ app.get('/admin/export.csv', (req, res) => {
   for (const r of rows) {
     res.write([r.id, r.created_at, r.telefono, r.area, r.nombre, r.dni, r.email, r.consulta].map(csvCell).join(',') + '\r\n');
   }
+  res.end();
+});
+
+// Excel con formato tabla (autofilter, headers estilizados, columnas auto-fit, filas alternadas)
+app.get('/admin/export.xlsx', async (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).send('unauth');
+  const where = [];
+  const params = [];
+  const q = (req.query.q || '').trim();
+  const area = (req.query.area || '').trim();
+  const desde = (req.query.desde || '').trim();
+  const hasta = (req.query.hasta || '').trim();
+  if (q) {
+    where.push('(nombre LIKE ? OR dni LIKE ? OR email LIKE ? OR telefono LIKE ? OR consulta LIKE ?)');
+    const like = '%' + q + '%';
+    params.push(like, like, like, like, like);
+  }
+  if (area) { where.push('LOWER(area) LIKE ?'); params.push('%' + area.toLowerCase() + '%'); }
+  if (desde) { where.push("date(created_at) >= date(?)"); params.push(desde); }
+  if (hasta) { where.push("date(created_at) <= date(?)"); params.push(hasta); }
+  const whereSql = where.length ? 'WHERE ' + where.join(' AND ') : '';
+  const rows = db.prepare(`SELECT id, created_at, telefono, area, nombre, dni, email, consulta FROM consultas ${whereSql} ORDER BY created_at DESC`).all(...params);
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Columen Admin';
+  wb.created = new Date();
+  const ws = wb.addWorksheet('Consultas', {
+    views: [{ state: 'frozen', ySplit: 1 }],
+  });
+
+  const columns = [
+    { header: 'ID',        key: 'id',        width: 6 },
+    { header: 'Fecha',     key: 'fecha',     width: 20 },
+    { header: 'Teléfono',  key: 'telefono',  width: 17 },
+    { header: 'Área',      key: 'area',      width: 12 },
+    { header: 'Nombre',    key: 'nombre',    width: 24 },
+    { header: 'DNI',       key: 'dni',       width: 12 },
+    { header: 'Email',     key: 'email',     width: 28 },
+    { header: 'Consulta',  key: 'consulta',  width: 70 },
+  ];
+
+  ws.addTable({
+    name: 'HistorialConsultas',
+    ref: 'A1',
+    headerRow: true,
+    totalsRow: false,
+    style: { theme: 'TableStyleMedium2', showRowStripes: true },
+    columns: columns.map(c => ({ name: c.header, filterButton: true })),
+    rows: rows.map(r => [
+      r.id,
+      r.created_at,
+      r.telefono ? '+' + r.telefono : '',
+      r.area || '',
+      r.nombre || '',
+      r.dni || '',
+      r.email || '',
+      r.consulta || '',
+    ]),
+  });
+
+  columns.forEach((c, i) => { ws.getColumn(i + 1).width = c.width; });
+  ws.getRow(1).font = { bold: true, color: { argb: 'FFF4F0E4' }, size: 12 };
+  ws.getRow(1).height = 24;
+  ws.getRow(1).alignment = { vertical: 'middle', horizontal: 'left' };
+
+  // Wrap text en columna Consulta + alineación vertical superior para todas las filas
+  for (let i = 2; i <= rows.length + 1; i++) {
+    ws.getRow(i).alignment = { vertical: 'top', wrapText: true };
+    ws.getRow(i).height = 18;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const fname = `columen-consultas-${today}.xlsx`;
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${fname}"`);
+  await wb.xlsx.write(res);
   res.end();
 });
 
@@ -977,6 +1054,7 @@ app.get('/admin/backup', (req, res) => {
     <h2>Consultas de hoy</h2>
     <div class="meta">${consultasHoy.length} ${consultasHoy.length === 1 ? 'consulta' : 'consultas'} · ${escapeHtml(prettyDay(todayStr))}</div>
     <div class="cs-actions">
+      <a class="btn-sec" href="/admin/export.xlsx?desde=${encodeURIComponent(todayStr)}&hasta=${encodeURIComponent(todayStr)}" title="Descargar Excel de hoy con formato tabla">⬇ Excel de hoy</a>
       <a class="btn-sec" href="/admin/export.csv?desde=${encodeURIComponent(todayStr)}&hasta=${encodeURIComponent(todayStr)}" title="Descargar CSV de hoy">⬇ CSV de hoy</a>
     </div>
     <div class="scroll-x">${hoyHtml}</div>
@@ -985,6 +1063,7 @@ app.get('/admin/backup', (req, res) => {
     <h2>Historial de consultas</h2>
     <div class="meta">${totalConsultas} ${totalConsultas === 1 ? 'consulta' : 'consultas'} en total · agrupadas por día</div>
     <div class="cs-actions">
+      <a class="btn-sec" href="/admin/export.xlsx" title="Descargar Excel completo con formato tabla">⬇ Excel completo</a>
       <a class="btn-sec" href="/admin/export.csv" title="Descargar CSV con todas las consultas">⬇ CSV completo</a>
     </div>
     ${historialHtml}
