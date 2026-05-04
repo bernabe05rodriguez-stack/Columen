@@ -1284,10 +1284,22 @@ app.post('/admin/inbox/:tel/send-template', requireCsrf, async (req, res) => {
   }
   const result = await sendTemplate(tel);
   if (result?.error) {
+    const detail = result.error.message || 'Error de WhatsApp';
+    const lower = detail.toLowerCase();
+    let hint = 'Verificá la plantilla en business.facebook.com.';
+    if (lower.includes('does not exist') || lower.includes('not found')) {
+      hint = 'La plantilla "' + RECONTACT_TEMPLATE_NAME + '" no existe en este WABA. Revisá el nombre en Meta Business.';
+    } else if (lower.includes('not approved') || lower.includes('pending') || lower.includes('rejected')) {
+      hint = 'La plantilla "' + RECONTACT_TEMPLATE_NAME + '" no está APROBADA todavía. Esperá a que Meta la apruebe (PENDING -> APPROVED).';
+    } else if (lower.includes('rate') || lower.includes('limit')) {
+      hint = 'Límite de mensajes alcanzado. Esperá unos minutos.';
+    } else if (lower.includes('#100') || lower.includes('invalid parameter')) {
+      hint = 'Parámetro inválido. Probable causa: nombre de plantilla incorrecto, idioma incorrecto, o plantilla todavía PENDING en Meta.';
+    }
     return res.status(400).json({
       error: 'wa_error',
-      detail: result.error.message || 'Error de WhatsApp',
-      hint: 'Verificá que la plantilla esté APROBADA en business.facebook.com (las en revisión rebotan).',
+      detail,
+      hint,
       raw: result.error,
     });
   }

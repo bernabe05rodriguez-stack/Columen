@@ -23,7 +23,7 @@ const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'columen-verify-202
 const APP_SECRET = process.env.APP_SECRET || '';
 
 // Plantilla aprobada para reabrir ventana 24hs (UTILITY, sin variables)
-const RECONTACT_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_RECONTACT_NAME || 'columen';
+const RECONTACT_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_RECONTACT_NAME || 'columen_mensaje';
 const RECONTACT_TEMPLATE_LANG = process.env.WHATSAPP_TEMPLATE_RECONTACT_LANG || 'es_AR';
 const RECONTACT_TEMPLATE_PREVIEW = process.env.WHATSAPP_TEMPLATE_RECONTACT_PREVIEW || 'Buen día me comunico de Columen';
 
