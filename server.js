@@ -828,9 +828,10 @@ app.get('/admin/backup', (req, res) => {
   .nav .sep{width:1px;height:18px;background:rgba(255,255,255,.1);margin:0 6px}
   .nav .logout{color:rgba(244,240,228,.5)}
   .nav .logout:hover{color:#f4d6d6;background:rgba(195,80,80,.12)}
-  main{max-width:920px;margin:0 auto;padding:28px 28px 60px}
-  .page-head h1{font-family:'Lora',Georgia,serif;font-size:32px;font-weight:600;color:var(--navy);letter-spacing:-.01em;line-height:1.1;margin-bottom:6px}
-  .page-head .lead{color:var(--ink-55);font-size:14px;margin-bottom:24px}
+  main{max-width:1400px;margin:0 auto;padding:28px 28px 60px}
+  .page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;flex-wrap:wrap;gap:16px}
+  .page-head h1{font-family:'Lora',Georgia,serif;font-size:32px;font-weight:600;color:var(--navy);letter-spacing:-.01em;line-height:1.1}
+  .page-head .lead{color:var(--ink-55);font-size:14px;margin-top:6px}
   .warn{display:grid;grid-template-columns:auto 1fr;gap:14px;background:var(--surface);border:1px solid var(--card-border);border-left:3px solid var(--gold);color:var(--ink);padding:16px 20px;border-radius:12px;margin-bottom:22px;font-size:13.5px;line-height:1.6;align-items:flex-start;box-shadow:0 4px 14px -8px rgba(26,39,68,.15)}
   .warn .warn-ico{width:24px;height:24px;color:var(--gold);flex-shrink:0;margin-top:2px}
   .warn .warn-ico svg{width:100%;height:100%}
@@ -896,7 +897,7 @@ app.get('/admin/backup', (req, res) => {
   details.day .day-body{padding:0 4px 4px;overflow-x:auto}
   .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
   @media(max-width:880px){main{padding:18px 14px 40px}.topbar{padding:10px 14px;gap:8px}.brand svg{height:40px}.nav a{padding:7px 10px;font-size:12.5px}.page-head h1{font-size:24px}.card{padding:22px 20px}}
-  @media(max-width:640px){
+  @media(max-width:560px){
     .topbar{padding:8px 10px;gap:6px;flex-wrap:wrap}
     .brand svg{height:34px}
     .nav{gap:2px;flex-wrap:wrap;justify-content:flex-end}
@@ -951,8 +952,10 @@ app.get('/admin/backup', (req, res) => {
 </div>
 <main>
   <div class="page-head">
-    <h1>Backup</h1>
-    <div class="lead">Snapshots automáticos y descarga manual de la base de datos.</div>
+    <div>
+      <h1>Backup</h1>
+      <div class="lead">Snapshots automáticos y descarga manual de la base de datos.</div>
+    </div>
   </div>
   <div class="warn">
     <div class="warn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
@@ -1303,27 +1306,28 @@ app.get('/admin/inbox', (req, res) => {
   button{font-family:inherit}
 
   /* Columen topbar */
-  .topbar{background:#1a2744;color:#f4f0e4;padding:10px 22px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4);z-index:5}
-  .topbar .brand{display:flex;align-items:center;gap:10px}
-  .topbar .brand svg{height:42px;width:auto;display:block;max-width:100%}
-  @media(max-width:768px){
-    .topbar{padding:8px 10px;gap:6px}
-    .topbar .brand svg{height:32px}
-    .topbar .r{flex-wrap:wrap;justify-content:flex-end}
-    .topbar .r a{padding:6px 8px;font-size:12px;letter-spacing:0}
-    .topbar .r .sep{display:none}
-  }
-  @media(max-width:480px){
-    .topbar .brand svg{height:28px}
-    .topbar .r a{padding:5px 7px;font-size:11.5px}
-  }
-  .topbar .r{display:flex;align-items:center;gap:4px}
-  .topbar .r a{color:rgba(244,240,228,.62);font-size:13px;padding:7px 12px;border-radius:7px;transition:background .15s,color .15s;letter-spacing:.02em}
+  .topbar{background:#1a2744;color:#f4f0e4;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4);z-index:5}
+  .topbar .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  .topbar .brand svg{height:48px;width:auto;display:block;max-width:100%}
+  .topbar .r{display:flex;align-items:center;gap:6px}
+  .topbar .r a{color:rgba(244,240,228,.62);font-size:13px;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em;white-space:nowrap}
   .topbar .r a:hover{color:#f4f0e4;background:rgba(255,255,255,.06)}
   .topbar .r a.active{color:#f4f0e4;background:rgba(184,151,74,.18);box-shadow:inset 0 -2px 0 #b8974a}
-  .topbar .r .sep{width:1px;height:16px;background:rgba(255,255,255,.1);margin:0 4px}
+  .topbar .r .sep{width:1px;height:18px;background:rgba(255,255,255,.1);margin:0 6px}
   .topbar .r a.logout{color:rgba(244,240,228,.5)}
   .topbar .r a.logout:hover{color:#f4d6d6;background:rgba(195,80,80,.12)}
+  @media(max-width:880px){
+    .topbar{padding:10px 14px;gap:8px}
+    .topbar .brand svg{height:40px}
+    .topbar .r a{padding:7px 10px;font-size:12.5px}
+  }
+  @media(max-width:560px){
+    .topbar{padding:8px 10px;gap:6px;flex-wrap:wrap}
+    .topbar .brand svg{height:34px}
+    .topbar .r{gap:2px;flex-wrap:wrap;justify-content:flex-end}
+    .topbar .r a{padding:6px 9px;font-size:12px;letter-spacing:0}
+    .topbar .r .sep{display:none}
+  }
 
   /* WhatsApp layout */
   .layout{flex:1;display:flex;overflow:hidden;background:#EFEAE2}
