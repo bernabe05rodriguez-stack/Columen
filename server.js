@@ -1338,7 +1338,7 @@ app.get('/admin/inbox', (req, res) => {
   .layout{flex:1;display:flex;overflow:hidden;background:#EFEAE2}
   .sidebar{width:400px;background:#fff;display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid #E9EDEF}
   .side-header{background:#F0F2F5;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
-  .side-header .avatar{width:40px;height:40px;border-radius:50%;background:#00A884;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px}
+  .side-header .avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1a2744 0%,#2a3960 100%);color:#f4f0e4;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;font-family:'Lora',Georgia,serif;letter-spacing:.5px;box-shadow:0 2px 6px -1px rgba(26,39,68,.35),inset 0 0 0 1.5px rgba(184,151,74,.5)}
   .side-header .actions{display:flex;gap:4px}
   .side-header .ico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#54656F;background:transparent;border:none;font-size:18px}
   .side-header .ico:hover{background:#E9EDEF}
@@ -1358,7 +1358,8 @@ app.get('/admin/inbox', (req, res) => {
   .conv{padding:10px 16px;cursor:pointer;display:flex;gap:12px;align-items:center;position:relative;border-bottom:1px solid #F0F2F5}
   .conv:hover{background:#F5F6F6}
   .conv.active{background:#F0F2F5}
-  .conv .avatar{width:49px;height:49px;border-radius:50%;background:#DFE5E7;color:#54656F;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:17px;flex-shrink:0}
+  .conv .avatar{width:49px;height:49px;border-radius:50%;background:#54656F;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:18px;flex-shrink:0;letter-spacing:.5px;text-transform:uppercase;box-shadow:0 1px 2px rgba(0,0,0,.08);overflow:hidden}
+  .conv .avatar svg{width:60%;height:60%}
   .conv .body{flex:1;min-width:0;padding:4px 0}
   .conv .row1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   .conv .name{font-weight:400;font-size:17px;color:#111B21;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1385,7 +1386,8 @@ app.get('/admin/inbox', (req, res) => {
   .chat-header{background:#F0F2F5;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;border-left:1px solid #E9EDEF;gap:8px}
   .chat-header .info{display:flex;align-items:center;gap:12px;cursor:pointer;flex:1;min-width:0}
   .chat-header .info-text{flex:1;min-width:0}
-  .chat-header .avatar{width:40px;height:40px;border-radius:50%;background:#DFE5E7;color:#54656F;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:15px;flex-shrink:0}
+  .chat-header .avatar{width:40px;height:40px;border-radius:50%;background:#54656F;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15.5px;flex-shrink:0;letter-spacing:.5px;text-transform:uppercase;box-shadow:0 1px 2px rgba(0,0,0,.08);overflow:hidden}
+  .chat-header .avatar svg{width:60%;height:60%}
   .chat-header .name{font-weight:500;font-size:16px;color:#111B21;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .chat-header .sub{font-size:13px;color:#667781;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .chat-header .back{width:36px;height:36px;border-radius:50%;display:none;align-items:center;justify-content:center;background:transparent;border:none;color:#54656F;cursor:pointer;font-size:22px;flex-shrink:0;padding:0}
@@ -1498,7 +1500,8 @@ app.get('/admin/inbox', (req, res) => {
   .info-header .close{cursor:pointer;color:#54656F;font-size:22px;background:transparent;border:none}
   .info-header h3{font-size:16px;font-weight:500}
   .info-avatar{text-align:center;padding:32px 20px;background:#fff}
-  .info-avatar .big-avatar{width:150px;height:150px;border-radius:50%;background:#DFE5E7;color:#54656F;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:50px;margin:0 auto 16px}
+  .info-avatar .big-avatar{width:150px;height:150px;border-radius:50%;background:#54656F;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:60px;margin:0 auto 16px;letter-spacing:1px;text-transform:uppercase;box-shadow:0 6px 18px -8px rgba(0,0,0,.25);overflow:hidden}
+  .info-avatar .big-avatar svg{width:55%;height:55%}
   .info-avatar .name{font-size:24px;color:#111B21;margin-bottom:4px}
   .info-avatar .tel{font-size:16px;color:#667781}
   .info-section{background:#fff;padding:16px 24px;margin-top:10px;border-top:1px solid #E9EDEF;border-bottom:1px solid #E9EDEF}
@@ -1718,7 +1721,28 @@ app.get('/admin/inbox', (req, res) => {
   }
 
   const $ = sel => document.querySelector(sel);
-  function initials(s){ if(!s) return '?'; const p=s.trim().split(/\\s+/); return ((p[0]?.[0]||'')+(p[1]?.[0]||'')).toUpperCase() || '?'; }
+  function initials(s){ if(!s) return ''; const p=s.trim().split(/\\s+/); return ((p[0]?.[0]||'')+(p[1]?.[0]||'')).toUpperCase(); }
+  const AVATAR_PALETTE = ['#5B7FB1','#E07B5B','#7FA88A','#A07AAD','#B58A4A','#5FA5A5','#C78586','#7B9F5C','#BC6F8E','#5E7B91','#D5946F','#8B7AA7','#6B8E5C','#A37BB1','#C28A55'];
+  function avatarColor(seed){
+    const s = String(seed || '');
+    if (!s) return '#54656F';
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = ((h << 5) - h) + s.charCodeAt(i) | 0;
+    return AVATAR_PALETTE[Math.abs(h) % AVATAR_PALETTE.length];
+  }
+  const PERSON_SVG = '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 12c2.7 0 4.9-2.2 4.9-4.9S14.7 2.2 12 2.2 7.1 4.4 7.1 7.1 9.3 12 12 12zm0 2.4c-3.3 0-9.8 1.6-9.8 4.9v2.5h19.6v-2.5c0-3.3-6.5-4.9-9.8-4.9z"/></svg>';
+  function avatarHtml(name, tel){
+    const ini = initials(name && !/^\\+?\\d+$/.test(String(name).trim()) ? name : '');
+    const bg = avatarColor(tel || name);
+    const inner = ini || PERSON_SVG;
+    return '<div class="avatar" style="background:'+bg+'">'+inner+'</div>';
+  }
+  function bigAvatarHtml(name, tel){
+    const ini = initials(name && !/^\\+?\\d+$/.test(String(name).trim()) ? name : '');
+    const bg = avatarColor(tel || name);
+    const inner = ini || PERSON_SVG;
+    return '<div class="big-avatar" style="background:'+bg+'">'+inner+'</div>';
+  }
   function escapeHtml(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   function csrfHeader(){
     const m = document.cookie.match(/(?:^|; )csrf=([^;]+)/);
@@ -1821,7 +1845,7 @@ app.get('/admin/inbox', (req, res) => {
       if (c.last_direction === 'out') preview += tickFor(c.last_status) + ' ';
       preview += escapeHtml((c.last_body||'').slice(0,80));
       return '<div class="conv '+(c.telefono===state.activeTel?'active ':'')+(c.unread?'unread ':'')+'" data-tel="'+c.telefono+'">'+
-        '<div class="avatar">'+initials(name)+'</div>'+
+        avatarHtml(name, c.telefono)+
         '<div class="body">'+
           '<div class="row1"><div class="name">'+escapeHtml(name)+botTag+'</div><div class="time">'+formatListTime(c.last_at)+'</div></div>'+
           '<div class="row2"><div class="preview">'+preview+'</div>'+unread+'</div>'+
@@ -2136,7 +2160,7 @@ app.get('/admin/inbox', (req, res) => {
     header.innerHTML =
       '<button class="back" id="btnBack" title="Volver" aria-label="Volver">←</button>'+
       '<div class="info" id="openInfo">'+
-        '<div class="avatar">'+initials(name)+'</div>'+
+        avatarHtml(name, c.telefono)+
         '<div class="info-text"><div class="name">'+escapeHtml(name)+'</div><div class="sub">+'+escapeHtml(c.telefono)+' · '+escapeHtml(lastSeen)+'</div></div>'+
       '</div>'+
       '<div class="actions">'+
@@ -2212,7 +2236,7 @@ app.get('/admin/inbox', (req, res) => {
         '<h3>Datos del contacto</h3>'+
       '</div>'+
       '<div class="info-avatar">'+
-        '<div class="big-avatar">'+initials(name)+'</div>'+
+        bigAvatarHtml(name, info.telefono)+
         '<div class="name">'+escapeHtml(name)+'</div>'+
         '<div class="tel">+'+escapeHtml(info.telefono)+'</div>'+
       '</div>'+
