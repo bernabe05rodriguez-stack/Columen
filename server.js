@@ -1349,16 +1349,14 @@ app.get('/admin/inbox', (req, res) => {
   /* WhatsApp layout */
   .layout{flex:1;display:flex;overflow:hidden;background:#EFEAE2}
   .sidebar{width:400px;background:#fff;display:flex;flex-direction:column;flex-shrink:0;border-right:1px solid #E9EDEF}
-  .side-header{background:#F0F2F5;padding:10px 16px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
-  .side-header .avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#1a2744 0%,#2a3960 100%);color:#f4f0e4;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;font-family:'Lora',Georgia,serif;letter-spacing:.5px;box-shadow:0 2px 6px -1px rgba(26,39,68,.35),inset 0 0 0 1.5px rgba(184,151,74,.5)}
-  .side-header .actions{display:flex;gap:4px}
-  .side-header .ico{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#54656F;background:transparent;border:none;font-size:18px}
-  .side-header .ico:hover{background:#E9EDEF}
 
-  .search-wrap{padding:8px 12px;background:#fff;flex-shrink:0}
-  .search-box{background:#F0F2F5;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:10px}
-  .search-box input{border:none;background:transparent;outline:none;flex:1;font-size:14px;color:#111B21}
+  .search-wrap{padding:10px 12px 8px;background:#fff;flex-shrink:0;display:flex;align-items:center;gap:6px}
+  .search-box{background:#F0F2F5;border-radius:8px;padding:6px 14px;display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+  .search-box input{border:none;background:transparent;outline:none;flex:1;min-width:0;font-size:14px;color:#111B21}
   .search-box .ico-search{color:#54656F;font-size:14px}
+  .search-actions{display:flex;gap:2px;flex-shrink:0}
+  .search-actions .ico{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#54656F;background:transparent;border:none;font-size:17px;transition:background .15s}
+  .search-actions .ico:hover{background:#E9EDEF}
 
   .label-filter{padding:6px 10px 8px;display:flex;flex-wrap:wrap;gap:6px;background:#fff;flex-shrink:0}
   .label-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:500;color:#fff;cursor:pointer;opacity:.55;border:none}
@@ -1622,17 +1620,14 @@ app.get('/admin/inbox', (req, res) => {
 </div>
 <div class="layout" id="layout">
   <div class="sidebar">
-    <div class="side-header">
-      <div class="avatar" title="COLUMEN">C</div>
-      <div class="actions">
-        <button class="ico" id="manageLabels" title="Gestionar etiquetas">🏷️</button>
-        <button class="ico" title="Nuevo chat (manual)" id="btnNewChat">✏️</button>
-      </div>
-    </div>
     <div class="search-wrap">
       <div class="search-box">
         <span class="ico-search">🔍</span>
         <input id="searchInp" type="text" placeholder="Buscar o empezar un chat nuevo">
+      </div>
+      <div class="search-actions">
+        <button class="ico" id="manageLabels" title="Gestionar etiquetas">🏷️</button>
+        <button class="ico" title="Nuevo chat (manual)" id="btnNewChat">✏️</button>
       </div>
     </div>
     <div class="label-filter" id="labelFilter"></div>
