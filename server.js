@@ -546,9 +546,9 @@ app.get('/admin', (req, res) => {
   *{box-sizing:border-box;margin:0;padding:0}
   html{scrollbar-gutter:stable}
   body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100dvh;font-size:14px}
-  .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4)}
+  .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4);font-family:'Inter',system-ui,sans-serif}
   .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
-  .brand svg{height:48px;width:auto;display:block;max-width:100%}
+  .brand svg{height:60px;width:auto;display:block;max-width:100%}
   .nav{display:flex;align-items:center;gap:6px}
   .nav a{color:rgba(244,240,228,.62);font-size:13px;text-decoration:none;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em;white-space:nowrap}
   .nav a:hover{color:var(--cream);background:rgba(255,255,255,.06)}
@@ -617,7 +617,7 @@ app.get('/admin', (req, res) => {
     .stats{grid-template-columns:1fr 1fr;gap:10px}
     main{padding:18px 14px 40px}
     .topbar{padding:10px 14px;gap:8px}
-    .brand svg{height:40px}
+    .brand svg{height:50px}
     .nav a{padding:7px 10px;font-size:12.5px}
     .page-head h1{font-size:24px}
     .filters{padding:14px}
@@ -628,7 +628,7 @@ app.get('/admin', (req, res) => {
   }
   @media(max-width:560px){
     .stats{grid-template-columns:1fr 1fr;gap:8px}
-    .brand svg{height:34px}
+    .brand svg{height:42px}
     .topbar{padding:8px 10px;gap:6px;flex-wrap:wrap}
     .nav{gap:2px;flex-wrap:wrap;justify-content:flex-end}
     .nav a{padding:6px 9px;font-size:12px;letter-spacing:0}
@@ -820,9 +820,9 @@ app.get('/admin/backup', (req, res) => {
   *{box-sizing:border-box;margin:0;padding:0}
   html{scrollbar-gutter:stable}
   body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100dvh;font-size:14px}
-  .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4)}
+  .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4);font-family:'Inter',system-ui,sans-serif}
   .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
-  .brand svg{height:48px;width:auto;display:block;max-width:100%}
+  .brand svg{height:60px;width:auto;display:block;max-width:100%}
   .nav{display:flex;align-items:center;gap:6px}
   .nav a{color:rgba(244,240,228,.62);font-size:13px;text-decoration:none;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em;white-space:nowrap}
   .nav a:hover{color:var(--cream);background:rgba(255,255,255,.06)}
@@ -898,10 +898,10 @@ app.get('/admin/backup', (req, res) => {
   details.day .day-count{color:var(--gold);font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;background:rgba(184,151,74,.1);padding:3px 9px;border-radius:999px}
   details.day .day-body{padding:0 4px 4px;overflow-x:auto}
   .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  @media(max-width:880px){main{padding:18px 14px 40px}.topbar{padding:10px 14px;gap:8px}.brand svg{height:40px}.nav a{padding:7px 10px;font-size:12.5px}.page-head h1{font-size:24px}.card{padding:22px 20px}}
+  @media(max-width:880px){main{padding:18px 14px 40px}.topbar{padding:10px 14px;gap:8px}.brand svg{height:50px}.nav a{padding:7px 10px;font-size:12.5px}.page-head h1{font-size:24px}.card{padding:22px 20px}}
   @media(max-width:560px){
     .topbar{padding:8px 10px;gap:6px;flex-wrap:wrap}
-    .brand svg{height:34px}
+    .brand svg{height:42px}
     .nav{gap:2px;flex-wrap:wrap;justify-content:flex-end}
     .nav a{padding:6px 9px;font-size:12px;letter-spacing:0}
     .nav .sep{display:none}
@@ -1311,9 +1311,9 @@ app.get('/admin/inbox', (req, res) => {
   button{font-family:inherit}
 
   /* Columen topbar */
-  .topbar{background:#1a2744;color:#f4f0e4;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4);z-index:5}
+  .topbar{background:#1a2744;color:#f4f0e4;padding:14px 28px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4);z-index:5;font-family:'Inter',system-ui,sans-serif}
   .topbar .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
-  .topbar .brand svg{height:48px;width:auto;display:block;max-width:100%}
+  .topbar .brand svg{height:60px;width:auto;display:block;max-width:100%}
   .topbar .r{display:flex;align-items:center;gap:6px}
   .topbar .r a{color:rgba(244,240,228,.62);font-size:13px;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;letter-spacing:.02em;white-space:nowrap}
   .topbar .r a:hover{color:#f4f0e4;background:rgba(255,255,255,.06)}
@@ -1323,12 +1323,12 @@ app.get('/admin/inbox', (req, res) => {
   .topbar .r a.logout:hover{color:#f4d6d6;background:rgba(195,80,80,.12)}
   @media(max-width:880px){
     .topbar{padding:10px 14px;gap:8px}
-    .topbar .brand svg{height:40px}
+    .topbar .brand svg{height:50px}
     .topbar .r a{padding:7px 10px;font-size:12.5px}
   }
   @media(max-width:560px){
     .topbar{padding:8px 10px;gap:6px;flex-wrap:wrap}
-    .topbar .brand svg{height:34px}
+    .topbar .brand svg{height:42px}
     .topbar .r{gap:2px;flex-wrap:wrap;justify-content:flex-end}
     .topbar .r a{padding:6px 9px;font-size:12px;letter-spacing:0}
     .topbar .r .sep{display:none}
