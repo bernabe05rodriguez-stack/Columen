@@ -755,6 +755,58 @@ app.get('/admin/backup', (req, res) => {
     const pretty = m ? `${m[1]} ${m[2].replace(/-/g,':')}${m[3] ? ` · <span class="reason">${escapeHtml(m[3])}</span>` : ''}` : escapeHtml(f);
     return `<tr><td><div class="when">${pretty}</div><code class="fn">${escapeHtml(f)}</code></td><td class="muted nowrap">${size} KB</td><td class="nowrap"><a class="dl" href="/admin/backup/download?file=${encodeURIComponent(f)}">Descargar</a></td></tr>`;
   }).join('');
+
+  // Snapshot textual de consultas (solo lectura, no modifica nada)
+  const allConsultas = db.prepare(
+    'SELECT id, created_at, telefono, area, nombre, dni, email, consulta FROM consultas ORDER BY created_at DESC'
+  ).all();
+  const totalConsultas = allConsultas.length;
+  const todayStr = db.prepare("SELECT date('now','localtime') AS d").get().d; // YYYY-MM-DD en TZ Argentina
+  const byDay = new Map();
+  for (const c of allConsultas) {
+    const day = (c.created_at || '').slice(0, 10);
+    if (!byDay.has(day)) byDay.set(day, []);
+    byDay.get(day).push(c);
+  }
+  const consultasHoy = byDay.get(todayStr) || [];
+  const dayLabels = { 0: 'Domingo', 1: 'Lunes', 2: 'Martes', 3: 'Miércoles', 4: 'Jueves', 5: 'Viernes', 6: 'Sábado' };
+  function prettyDay(d) {
+    if (!d) return '';
+    const [y, m, da] = d.split('-').map(Number);
+    const date = new Date(Date.UTC(y, m - 1, da));
+    return `${dayLabels[date.getUTCDay()]} ${String(da).padStart(2,'0')}/${String(m).padStart(2,'0')}/${y}`;
+  }
+  function consultaRow(c) {
+    const isJ = (c.area || '').toLowerCase().includes('juridic');
+    const hora = (c.created_at || '').slice(11, 16);
+    return `<tr>
+      <td class="muted nowrap" data-label="#">#${c.id}</td>
+      <td class="nowrap muted" data-label="Hora">${escapeHtml(hora)}</td>
+      <td class="nowrap" data-label="Teléfono"><a class="tel" href="/admin/inbox?tel=${encodeURIComponent(c.telefono || '')}" title="Abrir chat">${escapeHtml(c.telefono || '')}</a></td>
+      <td data-label="Área"><span class="badge ${isJ ? 'badge-j' : 'badge-n'}"><span class="dot"></span>${escapeHtml(c.area || '')}</span></td>
+      <td class="strong" data-label="Nombre">${escapeHtml(c.nombre || '')}</td>
+      <td class="muted" data-label="DNI">${escapeHtml(c.dni || '')}</td>
+      <td class="muted" data-label="Email">${escapeHtml(c.email || '')}</td>
+      <td class="consulta-cell" data-label="Consulta" title="${escapeHtml(c.consulta || '')}">${escapeHtml(c.consulta || '')}</td>
+    </tr>`;
+  }
+  function consultasTable(rows) {
+    return `<table class="cs-tbl"><thead><tr><th>#</th><th>Hora</th><th>Tel</th><th>Área</th><th>Nombre</th><th>DNI</th><th>Email</th><th>Consulta</th></tr></thead><tbody>${rows.map(consultaRow).join('')}</tbody></table>`;
+  }
+  const hoyHtml = consultasHoy.length
+    ? consultasTable(consultasHoy)
+    : '<div class="empty">Sin consultas hoy.</div>';
+  const sortedDays = [...byDay.keys()].sort().reverse();
+  const historialHtml = sortedDays.length
+    ? sortedDays.map(d => {
+        const rows = byDay.get(d);
+        const isToday = d === todayStr;
+        return `<details class="day"${isToday ? ' open' : ''}>
+          <summary><span class="day-name">${escapeHtml(prettyDay(d))}</span><span class="day-count">${rows.length} ${rows.length === 1 ? 'consulta' : 'consultas'}</span></summary>
+          <div class="day-body">${consultasTable(rows)}</div>
+        </details>`;
+      }).join('')
+    : '<div class="empty">Aún no hay consultas registradas.</div>';
   res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Backup · COLUMEN Admin</title>
@@ -810,6 +862,38 @@ app.get('/admin/backup', (req, res) => {
   .dl:hover{background:var(--gold);color:var(--cream);border-color:var(--gold)}
   .dl::before{content:'↓';font-size:14px;line-height:1}
   .empty{color:var(--ink-55);font-size:14px;text-align:center;padding:32px 0;font-style:italic}
+  /* Snapshot textual de consultas */
+  .cs-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .cs-actions .btn-sec{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:transparent;color:var(--gold);border:1.5px solid var(--cream-border);border-radius:8px;text-decoration:none;font-weight:600;font-size:12.5px;transition:background .2s,border-color .2s,color .2s}
+  .cs-actions .btn-sec:hover{background:var(--gold);color:var(--cream);border-color:var(--gold)}
+  .cs-tbl{width:100%;border-collapse:collapse;font-size:12.5px;table-layout:auto}
+  .cs-tbl thead th{background:var(--cream-2);color:var(--navy);padding:8px 10px;text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;border-bottom:1px solid var(--cream-border)}
+  .cs-tbl tbody td{padding:9px 10px;border-bottom:1px solid #f0ead8;vertical-align:top;font-size:12.5px}
+  .cs-tbl tbody tr:last-child td{border-bottom:none}
+  .cs-tbl tbody tr:hover td{background:#faf6ea}
+  .cs-tbl .tel{color:var(--gold);text-decoration:none;font-weight:600}
+  .cs-tbl .tel:hover{text-decoration:underline}
+  .cs-tbl .strong{font-weight:600;color:var(--navy)}
+  .cs-tbl .badge{display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+  .cs-tbl .badge .dot{width:6px;height:6px;border-radius:50%}
+  .cs-tbl .badge-j{background:rgba(106,172,214,.14);color:#365a7a}
+  .cs-tbl .badge-j .dot{background:#6aacd6}
+  .cs-tbl .badge-n{background:rgba(184,151,74,.14);color:var(--gold)}
+  .cs-tbl .badge-n .dot{background:var(--gold-soft)}
+  .cs-tbl .consulta-cell{max-width:340px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-55)}
+  .cs-tbl td.muted{color:var(--ink-55)}
+  .cs-tbl td.nowrap{white-space:nowrap}
+  details.day{border:1px solid var(--card-border);border-radius:10px;margin-bottom:10px;background:#fffdf6;overflow:hidden}
+  details.day[open]{box-shadow:0 4px 14px -10px rgba(26,39,68,.18)}
+  details.day summary{cursor:pointer;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;list-style:none;font-weight:500;color:var(--navy);user-select:none;transition:background .15s}
+  details.day summary::-webkit-details-marker{display:none}
+  details.day summary:hover{background:var(--cream-2)}
+  details.day summary::before{content:'▸';margin-right:10px;color:var(--gold);font-size:11px;transition:transform .2s}
+  details.day[open] summary::before{transform:rotate(90deg)}
+  details.day .day-name{flex:1;font-family:'Lora',Georgia,serif;font-size:15px;letter-spacing:.01em}
+  details.day .day-count{color:var(--gold);font-size:11px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;background:rgba(184,151,74,.1);padding:3px 9px;border-radius:999px}
+  details.day .day-body{padding:0 4px 4px;overflow-x:auto}
+  .scroll-x{overflow-x:auto;-webkit-overflow-scrolling:touch}
   @media(max-width:880px){main{padding:18px 14px 40px}.topbar{padding:10px 14px;gap:8px}.brand svg{height:40px}.nav a{padding:7px 10px;font-size:12.5px}.page-head h1{font-size:24px}.card{padding:22px 20px}}
   @media(max-width:640px){
     .topbar{padding:8px 10px;gap:6px;flex-wrap:wrap}
@@ -833,6 +917,15 @@ app.get('/admin/backup', (req, res) => {
     .when{margin-bottom:0}
     .fn{font-size:10.5px}
     .btn{width:100%;justify-content:center}
+    .cs-tbl{font-size:11.5px}
+    .cs-tbl,.cs-tbl thead,.cs-tbl tbody,.cs-tbl tr,.cs-tbl td{display:block;width:100%}
+    .cs-tbl thead{display:none}
+    .cs-tbl tbody tr{padding:10px 0;border-bottom:1px solid #eee8d9;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+    .cs-tbl tbody tr:last-child{border-bottom:none}
+    .cs-tbl tbody td{padding:2px 0;border:none;font-size:12px}
+    .cs-tbl tbody td:before{content:attr(data-label);font-weight:600;color:var(--navy);font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;margin-right:6px}
+    .cs-tbl .consulta-cell{grid-column:1/-1;white-space:normal;color:var(--ink-55)}
+    details.day .day-body{padding:0 8px 8px}
   }
 </style></head><body>
 <div class="topbar">
@@ -873,6 +966,22 @@ app.get('/admin/backup', (req, res) => {
     <h2>Snapshots</h2>
     <div class="meta">${files.length} backups · se conservan los últimos ${BACKUP_KEEP}</div>
     ${files.length ? `<table><thead><tr><th>Snapshot</th><th>Tamaño</th><th></th></tr></thead><tbody>${list}</tbody></table>` : '<div class="empty">No hay snapshots aún. Se generan al startup, cada hora y al recibir nuevas consultas.</div>'}
+  </div>
+  <div class="card">
+    <h2>Consultas de hoy</h2>
+    <div class="meta">${consultasHoy.length} ${consultasHoy.length === 1 ? 'consulta' : 'consultas'} · ${escapeHtml(prettyDay(todayStr))}</div>
+    <div class="cs-actions">
+      <a class="btn-sec" href="/admin/export.csv?desde=${encodeURIComponent(todayStr)}&hasta=${encodeURIComponent(todayStr)}" title="Descargar CSV de hoy">⬇ CSV de hoy</a>
+    </div>
+    <div class="scroll-x">${hoyHtml}</div>
+  </div>
+  <div class="card">
+    <h2>Historial de consultas</h2>
+    <div class="meta">${totalConsultas} ${totalConsultas === 1 ? 'consulta' : 'consultas'} en total · agrupadas por día</div>
+    <div class="cs-actions">
+      <a class="btn-sec" href="/admin/export.csv" title="Descargar CSV con todas las consultas">⬇ CSV completo</a>
+    </div>
+    ${historialHtml}
   </div>
 </main>
 </body></html>`);
