@@ -544,6 +544,7 @@ app.get('/admin', (req, res) => {
 <style>
   :root{--navy:#1a2744;--navy-2:#233050;--cream:#f4f0e4;--cream-2:#ece6d5;--cream-border:#d8d0bc;--gold:#8a6d2b;--gold-soft:#b8974a;--ink:#1c1c1c;--ink-55:rgba(28,28,28,.58);--ink-25:rgba(28,28,28,.25);--accent:#6aacd6;--card-border:#e8e2cf;--surface:#fffdf6}
   *{box-sizing:border-box;margin:0;padding:0}
+  html{scrollbar-gutter:stable}
   body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100dvh;font-size:14px}
   .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4)}
   .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
@@ -817,6 +818,7 @@ app.get('/admin/backup', (req, res) => {
 <style>
   :root{--navy:#1a2744;--navy-2:#233050;--cream:#f4f0e4;--cream-2:#ece6d5;--cream-border:#d8d0bc;--gold:#8a6d2b;--gold-soft:#b8974a;--ink:#1c1c1c;--ink-55:rgba(28,28,28,.58);--accent:#6aacd6;--card-border:#e8e2cf;--surface:#fffdf6}
   *{box-sizing:border-box;margin:0;padding:0}
+  html{scrollbar-gutter:stable}
   body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100dvh;font-size:14px}
   .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4)}
   .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
@@ -1301,6 +1303,7 @@ app.get('/admin/inbox', (req, res) => {
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{height:100%}
+  html{scrollbar-gutter:stable}
   body{font-family:"Segoe UI","Helvetica Neue",Roboto,system-ui,sans-serif;background:#F0F2F5;color:#111B21;display:flex;flex-direction:column;height:100vh;overflow:hidden}
   a{color:inherit;text-decoration:none}
   button{font-family:inherit}
