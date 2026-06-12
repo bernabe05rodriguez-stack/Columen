@@ -465,10 +465,10 @@
   };
   // Arranca apenas el DOM está listo (no espera todo el load): el splash
   // nunca se siente colgado aunque la red venga lenta.
-  const start=()=>setTimeout(go,950);
+  const start=()=>setTimeout(go,1750);
   if(document.readyState!=='loading') start();
   else document.addEventListener('DOMContentLoaded',start,{once:true});
-  setTimeout(go,2300); // techo absoluto
+  setTimeout(go,3200); // techo absoluto
 })();
 
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1,rootMargin:'0px 0px -40px 0px'});
