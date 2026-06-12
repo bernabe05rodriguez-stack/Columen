@@ -132,12 +132,15 @@
   <symbol id="ico-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
 </svg>
 
+<div class="intro" id="intro" aria-hidden="true"><img src="/marca.webp" class="intro-mark" id="introMark" alt="" width="1000" height="1000" fetchpriority="high"></div>
+<noscript><style>.intro{display:none}</style></noscript>
+
 <a href="#main" class="skip-link">Saltar al contenido</a>
 <header class="site">
   <div class="container nav">
     <a href="/" class="logo-wrap" aria-label="Columen — Inicio">
-      <svg class="logo-d" viewBox="0 0 690 170" xmlns="http://www.w3.org/2000/svg"><use href="#logo-navy"/></svg>
-      <svg class="logo-m" viewBox="0 0 380 90" xmlns="http://www.w3.org/2000/svg"><use href="#logo-m-navy"/></svg>
+      <img class="brand-mark" id="brandMark" src="/marca.webp" alt="" width="1000" height="1000" decoding="async">
+      <span class="brand-text"><span class="brand-name">COLUMEN</span><span class="brand-sub">LEGAL &amp; NOTARIAL</span></span>
     </a>
     <nav aria-label="Navegación principal"><ul>
       <li><a href="#servicios">Servicios</a></li>
@@ -390,7 +393,7 @@
 
 <div id="mob-overlay" class="mobile-overlay">
   <div class="mobile-overlay-header">
-    <a href="#" class="logo-wrap" onclick="document.getElementById('mob-overlay').classList.remove('open')"><svg viewBox="0 0 380 90" xmlns="http://www.w3.org/2000/svg"><use href="#logo-m-navy"/></svg></a>
+    <a href="/" class="logo-wrap"><img class="brand-mark" src="/marca.webp" alt="" width="1000" height="1000" decoding="async"><span class="brand-text"><span class="brand-name">COLUMEN</span></span></a>
     <button class="mobile-close" aria-label="Cerrar menú" onclick="document.getElementById('mob-overlay').classList.remove('open')">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
     </button>
@@ -412,6 +415,42 @@
 </div>
 
 <script>
+// Intro: logo a pantalla completa que vuela hasta su lugar en el header (FLIP).
+// Se ve una vez por sesión; se saltea con reduced-motion o sin JS.
+(function(){
+  const intro=document.getElementById('intro');
+  if(!intro) return;
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let seen=false;
+  try{seen=!!sessionStorage.getItem('columenIntro')}catch(e){}
+  if(reduce||seen){intro.remove();return}
+  try{sessionStorage.setItem('columenIntro','1')}catch(e){}
+  document.documentElement.style.overflow='hidden';
+  const mark=document.getElementById('introMark');
+  const target=document.getElementById('brandMark');
+  if(!target){intro.remove();document.documentElement.style.overflow='';return}
+  target.style.visibility='hidden';
+  let flown=false;
+  const go=()=>{
+    if(flown)return; flown=true;
+    const a=mark.getBoundingClientRect(), b=target.getBoundingClientRect();
+    const dx=(b.left+b.width/2)-(a.left+a.width/2);
+    const dy=(b.top+b.height/2)-(a.top+a.height/2);
+    const s=b.width/a.width;
+    mark.style.transition='transform 1.05s cubic-bezier(.65,0,.22,1)';
+    mark.style.transform='translate('+dx+'px,'+dy+'px) scale('+s+')';
+    intro.classList.add('done');
+    setTimeout(()=>{
+      target.style.visibility='';
+      intro.remove();
+      document.documentElement.style.overflow='';
+    },1120);
+  };
+  if(document.readyState==='complete') setTimeout(go,700);
+  else window.addEventListener('load',()=>setTimeout(go,700),{once:true});
+  setTimeout(go,2400); // fallback si load tarda
+})();
+
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1,rootMargin:'0px 0px -40px 0px'});
 document.querySelectorAll('.reveal').forEach(el=>io.observe(el));
 

@@ -65,6 +65,18 @@ header.site{position:sticky;top:0;z-index:50;background:rgba(255,253,249,.86);-w
 .logo-wrap{display:flex;align-items:center;flex-shrink:0;min-width:0}
 .logo-wrap svg{height:64px;width:auto;max-width:300px;display:block}
 .logo-wrap .logo-m{display:none}
+
+/* Marca nueva en el header: imagen 3D + wordmark */
+.brand-mark{width:54px;height:54px;border-radius:50%;display:block;box-shadow:0 2px 10px -3px rgba(26,39,68,.3),0 0 0 1px rgba(184,151,74,.18);flex-shrink:0}
+.brand-text{display:flex;flex-direction:column;gap:5px;margin-left:14px;padding-left:14px;border-left:1px solid rgba(26,39,68,.16);min-width:0}
+.brand-name{font-family:'Lora',Georgia,serif;font-weight:700;font-size:21px;letter-spacing:.16em;color:var(--navy);line-height:1;white-space:nowrap}
+.brand-sub{font-family:'Inter',sans-serif;font-weight:600;font-size:8.5px;letter-spacing:.34em;color:var(--gold);line-height:1;white-space:nowrap}
+
+/* Intro: el logo llena la página y vuela al header */
+.intro{position:fixed;inset:0;background:var(--paper);z-index:300;display:flex;align-items:center;justify-content:center}
+.intro.done{pointer-events:none;background:transparent;transition:background .55s ease .1s}
+.intro-mark{width:min(300px,56vw);height:auto;aspect-ratio:1;border-radius:50%;display:block;box-shadow:0 40px 80px -28px rgba(26,39,68,.32),0 14px 30px -14px rgba(26,39,68,.16),0 0 0 1px rgba(184,151,74,.12);will-change:transform;animation:introIn .7s var(--ease)}
+@keyframes introIn{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:scale(1)}}
 .nav > nav{flex:1;display:flex;justify-content:center;min-width:0}
 .nav nav ul{display:flex;gap:30px;list-style:none;white-space:nowrap}
 .nav nav a{font-size:14px;color:var(--ink-70);transition:color .2s;position:relative;padding:4px 0}
@@ -285,6 +297,10 @@ footer.site{background:var(--navy);color:rgba(244,240,228,.4);padding:56px 0 40p
   .nav{height:66px;gap:10px}
   .logo-wrap .logo-d{display:none}
   .logo-wrap .logo-m{display:block;height:42px;max-width:210px}
+  .brand-mark{width:42px;height:42px}
+  .brand-text{gap:4px;margin-left:10px;padding-left:10px}
+  .brand-name{font-size:16.5px;letter-spacing:.13em}
+  .brand-sub{font-size:7px;letter-spacing:.26em}
   .nav-cta{font-size:12.5px;padding:9px 16px;gap:6px}
   .nav-cta svg{width:13px;height:13px}
   section{padding:64px 0}
