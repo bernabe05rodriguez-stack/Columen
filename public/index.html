@@ -132,7 +132,13 @@
   <symbol id="ico-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
 </svg>
 
-<div class="intro" id="intro" aria-hidden="true"><img src="/marca.webp" class="intro-mark" id="introMark" alt="" width="1000" height="1000" fetchpriority="high"></div>
+<div class="intro" id="intro" aria-hidden="true">
+  <div class="intro-stage">
+    <div class="intro-ring"></div>
+    <img src="/marca.webp" class="intro-mark" id="introMark" alt="" width="1000" height="1000" fetchpriority="high">
+  </div>
+  <div class="intro-word"><span class="intro-name">COLUMEN</span><span class="intro-sub">LEGAL &amp; NOTARIAL</span></div>
+</div>
 <noscript><style>.intro{display:none}</style></noscript>
 
 <a href="#main" class="skip-link">Saltar al contenido</a>
@@ -160,7 +166,7 @@
 
 <main id="main">
 <section class="hero">
-  <div class="container hero-grid">
+  <div class="container">
     <div class="hero-text">
       <div class="label reveal">Estudio jurídico y notarial · Mendoza</div>
       <h1 class="reveal d1">Un estudio tradicional con la <em class="it">comodidad digital.</em></h1>
@@ -173,13 +179,6 @@
         <a href="#servicios" class="btn btn-line">Ver servicios</a>
       </div>
     </div>
-    <div class="hero-visual reveal d2" aria-hidden="true">
-      <div class="hero-mark">
-        <img src="/marca.webp" alt="" width="1000" height="1000" fetchpriority="high" decoding="async">
-      </div>
-    </div>
-  </div>
-  <div class="container">
     <div class="stats">
       <div class="stat reveal">
         <div class="stat-num" data-prefix="+" data-target="30" data-suffix="">+30</div>
@@ -429,7 +428,9 @@
   const mark=document.getElementById('introMark');
   const target=document.getElementById('brandMark');
   if(!target){intro.remove();document.documentElement.style.overflow='';return}
+  const brandText=target.nextElementSibling;
   target.style.visibility='hidden';
+  if(brandText)brandText.classList.add('landing');
   let flown=false;
   const go=()=>{
     if(flown)return; flown=true;
@@ -437,18 +438,22 @@
     const dx=(b.left+b.width/2)-(a.left+a.width/2);
     const dy=(b.top+b.height/2)-(a.top+a.height/2);
     const s=b.width/a.width;
-    mark.style.transition='transform 1.05s cubic-bezier(.65,0,.22,1)';
-    mark.style.transform='translate('+dx+'px,'+dy+'px) scale('+s+')';
-    intro.classList.add('done');
+    intro.classList.add('fly');           // anillo y wordmark se despiden
+    intro.classList.add('done');          // el fondo se desvanece y muestra la página
+    mark.style.transition='transform 1.15s cubic-bezier(.6,.04,.18,1)';
+    mark.style.transform='translate('+dx+'px,'+dy+'px) scale('+s+') rotate(360deg)';
     setTimeout(()=>{
       target.style.visibility='';
+      // pop de aterrizaje + el texto del header se desliza a su lado
+      try{target.animate([{transform:'scale(.7)',opacity:.6},{transform:'scale(1.12)'},{transform:'scale(1)',opacity:1}],{duration:420,easing:'cubic-bezier(.2,.8,.3,1.2)'})}catch(e){}
+      if(brandText){brandText.classList.add('landed');brandText.classList.remove('landing')}
       intro.remove();
       document.documentElement.style.overflow='';
-    },1120);
+    },1180);
   };
-  if(document.readyState==='complete') setTimeout(go,700);
-  else window.addEventListener('load',()=>setTimeout(go,700),{once:true});
-  setTimeout(go,2400); // fallback si load tarda
+  if(document.readyState==='complete') setTimeout(go,1200);
+  else window.addEventListener('load',()=>setTimeout(go,1200),{once:true});
+  setTimeout(go,3000); // fallback si load tarda
 })();
 
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1,rootMargin:'0px 0px -40px 0px'});
