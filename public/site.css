@@ -209,6 +209,11 @@ section{padding:110px 0}
 
 /* ---------- Footer ---------- */
 footer.site{background:var(--navy);color:rgba(244,240,228,.4);padding:56px 0 40px;overflow:hidden}
+/* Brand nuevo en footer (variante sobre navy) */
+.foot-brand .brand-mark{width:62px;height:62px;box-shadow:0 4px 16px -4px rgba(0,0,0,.5),0 0 0 1px rgba(184,151,74,.3)}
+.foot-brand .brand-text{border-left-color:rgba(244,240,228,.18)}
+.foot-brand .brand-name{color:var(--cream);font-size:23px}
+.foot-brand .brand-sub{color:var(--gold-soft)}
 .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:24px;font-size:13.5px;min-width:0;max-width:100%}
 .foot .logo-wrap svg{height:88px;max-width:380px}
 .foot-info{text-align:right;line-height:1.8}
@@ -347,6 +352,8 @@ footer.site{background:var(--navy);color:rgba(244,240,228,.4);padding:56px 0 40p
   .foot{flex-direction:column;text-align:center;gap:16px;align-items:stretch}
   .foot .logo-wrap{justify-content:center}
   .foot .logo-wrap svg{height:84px;max-width:280px}
+  .foot-brand .brand-mark{width:52px;height:52px}
+  .foot-brand .brand-name{font-size:19px}
   .foot-info{text-align:center;font-size:12px}
   .foot-addr .addr-sep{display:none}
   .foot-addr .addr-line{display:block}

@@ -371,7 +371,7 @@ app.get('/admin/login', (req, res) => {
 <html lang="es"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin · COLUMEN</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+<link rel="icon" type="image/png" href="/favicon.png?v=4">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -629,7 +629,7 @@ app.get('/admin', (req, res) => {
 <html lang="es"><head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Consultas · COLUMEN Admin</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+<link rel="icon" type="image/png" href="/favicon.png?v=4">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -904,7 +904,7 @@ app.get('/admin/backup', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Backup · COLUMEN Admin</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+<link rel="icon" type="image/png" href="/favicon.png?v=4">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1212,7 +1212,7 @@ function adminBlogShell(title, inner, csrfToken) {
   return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(title)} · COLUMEN Admin</title>
-<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+<link rel="icon" type="image/png" href="/favicon.png?v=4">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -3427,7 +3427,7 @@ function publicPage({ title, description, canonical, content, jsonLd, ogType }) 
 <meta name="description" content="${escapeHtml(description)}">
 <meta name="theme-color" content="#fffdf9">
 <link rel="canonical" href="${escapeHtml(canonical)}">
-<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3">
+<link rel="icon" type="image/png" href="/favicon.png?v=4">
 <meta property="og:type" content="${ogType || 'website'}">
 <meta property="og:site_name" content="COLUMEN — Legal &amp; Notarial">
 <meta property="og:title" content="${escapeHtml(title)}">
@@ -3470,7 +3470,10 @@ ${content}
 </main>
 <footer class="site">
   <div class="container foot">
-    <a href="/" class="logo-wrap" aria-label="Columen — Inicio"><svg viewBox="5 0 405 170" xmlns="http://www.w3.org/2000/svg"><use href="#logo"/></svg></a>
+    <a href="/" class="logo-wrap foot-brand" aria-label="Columen — Inicio">
+      <img class="brand-mark" src="/marca.webp" alt="" width="1000" height="1000" loading="lazy" decoding="async">
+      <span class="brand-text"><span class="brand-name">COLUMEN</span><span class="brand-sub">LEGAL &amp; NOTARIAL</span></span>
+    </a>
     <div class="foot-info">
       <address class="foot-addr">
         <span class="addr-line">Catamarca 170, Planta Baja, oficinas 8 y 10</span><span class="addr-sep"> · </span><span class="addr-line">Ciudad de Mendoza</span>
