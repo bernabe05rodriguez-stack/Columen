@@ -433,8 +433,14 @@
   target.style.visibility='hidden';
   if(brandText)brandText.classList.add('landing');
   let flown=false;
+  const word=intro.querySelector('.intro-word');
   const go=()=>{
     if(flown)return; flown=true;
+    // Liberar las keyframes ANTES de volar: una animación CSS con fill activo
+    // pisa el transform/opacity inline y el vuelo no corre (logo clavado al centro).
+    mark.style.animation='none';
+    if(word)word.style.animation='none';
+    void mark.offsetWidth; // reflow: fija el estado base antes de transicionar
     const a=mark.getBoundingClientRect(), b=target.getBoundingClientRect();
     const dx=(b.left+b.width/2)-(a.left+a.width/2);
     const dy=(b.top+b.height/2)-(a.top+a.height/2);
