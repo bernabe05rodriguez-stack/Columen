@@ -133,6 +133,7 @@
 </svg>
 
 <div class="intro" id="intro" aria-hidden="true">
+  <div class="intro-bg"></div>
   <div class="intro-stage">
     <div class="intro-ring"></div>
     <img src="/marca.webp" class="intro-mark" id="introMark" alt="" width="1000" height="1000" fetchpriority="high">
@@ -438,6 +439,9 @@
     const dx=(b.left+b.width/2)-(a.left+a.width/2);
     const dy=(b.top+b.height/2)-(a.top+a.height/2);
     const s=b.width/a.width;
+    // Restaurar scroll ACÁ (no al final): el relayout coincide con el primer
+    // paint de la página bajo el fade y el aterrizaje queda sin tirones.
+    document.documentElement.style.overflow='';
     intro.classList.add('fly');           // anillo y wordmark se despiden
     intro.classList.add('done');          // el fondo se desvanece y muestra la página
     mark.style.transition='transform 1.15s cubic-bezier(.6,.04,.18,1)';
@@ -448,12 +452,14 @@
       try{target.animate([{transform:'scale(.7)',opacity:.6},{transform:'scale(1.12)'},{transform:'scale(1)',opacity:1}],{duration:420,easing:'cubic-bezier(.2,.8,.3,1.2)'})}catch(e){}
       if(brandText){brandText.classList.add('landed');brandText.classList.remove('landing')}
       intro.remove();
-      document.documentElement.style.overflow='';
     },1180);
   };
-  if(document.readyState==='complete') setTimeout(go,1200);
-  else window.addEventListener('load',()=>setTimeout(go,1200),{once:true});
-  setTimeout(go,3000); // fallback si load tarda
+  // Arranca apenas el DOM está listo (no espera todo el load): el splash
+  // nunca se siente colgado aunque la red venga lenta.
+  const start=()=>setTimeout(go,950);
+  if(document.readyState!=='loading') start();
+  else document.addEventListener('DOMContentLoaded',start,{once:true});
+  setTimeout(go,2300); // techo absoluto
 })();
 
 const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.1,rootMargin:'0px 0px -40px 0px'});
