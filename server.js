@@ -211,6 +211,20 @@ runMigration('add_templates_2026_04', () => {
     seeds.forEach(([n, b]) => db.prepare('INSERT INTO templates (name, body) VALUES (?,?)').run(n, b));
   }
 });
+runMigration('add_blog_posts_2026_06', () => {
+  // Aditiva: blog con carga autónoma desde el admin (pedido SEO del cliente)
+  db.exec(`CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,
+    title TEXT NOT NULL,
+    excerpt TEXT DEFAULT '',
+    body TEXT NOT NULL,
+    published INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT (datetime('now','localtime')),
+    updated_at DATETIME DEFAULT (datetime('now','localtime'))
+  )`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_posts_pub ON posts(published, created_at DESC)');
+});
 
 // Cleanup old sessions (older than 24h) y processed_messages (older than 7 días)
 db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
@@ -749,6 +763,7 @@ app.get('/admin', (req, res) => {
     <a href="/admin" class="active">Consultas</a>
     <a href="/admin/inbox">WhatsApp</a>
     <a href="/admin/backup">Backup</a>
+    <a href="/admin/blog">Blog</a>
     <span class="sep"></span>
     <a href="/admin/logout" class="logout">Salir</a>
   </nav>
@@ -1025,6 +1040,7 @@ app.get('/admin/backup', (req, res) => {
     <a href="/admin">Consultas</a>
     <a href="/admin/inbox">WhatsApp</a>
     <a href="/admin/backup" class="active">Backup</a>
+    <a href="/admin/blog">Blog</a>
     <span class="sep"></span>
     <a href="/admin/logout" class="logout">Salir</a>
   </nav>
@@ -1178,6 +1194,234 @@ app.delete('/admin/templates/:id', requireCsrf, (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   db.prepare('DELETE FROM templates WHERE id = ?').run(parseInt(req.params.id, 10));
   res.json({ ok: true });
+});
+
+// ============================================================
+// ADMIN BLOG — CMS simple para carga autónoma de artículos
+// ============================================================
+function slugify(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
+}
+
+function adminBlogShell(title, inner, csrfToken) {
+  return `<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(title)} · COLUMEN Admin</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#1a2744;--navy-2:#233050;--cream:#f4f0e4;--cream-2:#ece6d5;--cream-border:#d8d0bc;--gold:#8a6d2b;--gold-soft:#b8974a;--ink:#1c1c1c;--ink-55:rgba(28,28,28,.58);--card-border:#e8e2cf;--surface:#fffdf6}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scrollbar-gutter:stable}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--cream);color:var(--ink);min-height:100dvh;font-size:14px}
+  .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;box-shadow:0 1px 0 rgba(255,255,255,.04),0 2px 14px -6px rgba(0,0,0,.4)}
+  .brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+  .brand svg{height:60px;width:auto;display:block;max-width:100%}
+  .nav{display:flex;align-items:center;gap:6px}
+  .nav a{color:rgba(244,240,228,.62);font-size:13px;text-decoration:none;padding:8px 14px;border-radius:8px;transition:background .15s,color .15s;white-space:nowrap}
+  .nav a:hover{color:var(--cream);background:rgba(255,255,255,.06)}
+  .nav a.active{color:var(--cream);background:rgba(184,151,74,.18);box-shadow:inset 0 -2px 0 var(--gold-soft)}
+  .nav .sep{width:1px;height:18px;background:rgba(255,255,255,.1);margin:0 6px}
+  .nav .logout{color:rgba(244,240,228,.5)}
+  .nav .logout:hover{color:#f4d6d6;background:rgba(195,80,80,.12)}
+  main{max-width:980px;margin:0 auto;padding:28px 28px 60px}
+  .page-head{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:24px;flex-wrap:wrap;gap:16px}
+  .page-head h1{font-family:'Lora',Georgia,serif;font-size:32px;font-weight:600;color:var(--navy)}
+  .page-head .lead{color:var(--ink-55);font-size:14px;margin-top:6px}
+  .btn{padding:11px 20px;background:var(--navy);color:var(--cream);border:none;border-radius:9px;font-size:13.5px;font-weight:500;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:7px;font-family:inherit;transition:background .2s,box-shadow .2s}
+  .btn:hover{background:var(--navy-2);box-shadow:0 6px 16px -6px rgba(26,39,68,.4)}
+  .btn.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--cream-border)}
+  .btn.ghost:hover{background:var(--cream-2);box-shadow:none}
+  .btn.danger{background:transparent;color:#a3372a;border:1.5px solid #e8c8c0}
+  .btn.danger:hover{background:#fdf0ee;box-shadow:none}
+  .card{background:var(--surface);border:1px solid var(--card-border);border-radius:14px;padding:26px 28px;margin-bottom:18px;box-shadow:0 6px 24px -10px rgba(26,39,68,.08)}
+  table{width:100%;border-collapse:collapse}
+  thead th{background:var(--navy);color:rgba(244,240,228,.92);padding:10px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+  thead th:first-child{border-radius:8px 0 0 0}thead th:last-child{border-radius:0 8px 0 0}
+  tbody td{padding:12px 14px;border-bottom:1px solid #eee8d9;font-size:13.5px;vertical-align:middle}
+  tbody tr:last-child td{border-bottom:none}
+  tbody tr:hover td{background:#faf6ea}
+  .muted{color:var(--ink-55)}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+  .pill.pub{background:rgba(46,125,50,.12);color:#2e7d32}
+  .pill.draft{background:rgba(138,109,43,.12);color:var(--gold)}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .row-actions a,.row-actions button{font-size:12px;padding:6px 12px;border-radius:7px;border:1.5px solid var(--cream-border);background:#fff;color:var(--ink);cursor:pointer;text-decoration:none;font-family:inherit;transition:background .15s,border-color .15s}
+  .row-actions a:hover{background:var(--cream-2)}
+  .row-actions .del:hover{background:#fdf0ee;border-color:#e8c8c0;color:#a3372a}
+  label{display:block;font-size:11.5px;font-weight:600;color:var(--gold);margin:16px 0 7px;letter-spacing:.08em;text-transform:uppercase}
+  input[type=text],textarea{width:100%;padding:12px 14px;border:1.5px solid var(--cream-border);border-radius:10px;font-size:14.5px;outline:none;font-family:inherit;color:var(--ink);background:#fff;transition:border-color .2s,box-shadow .2s}
+  input[type=text]:focus,textarea:focus{border-color:var(--gold-soft);box-shadow:0 0 0 4px rgba(184,151,74,.12)}
+  textarea{resize:vertical;min-height:340px;line-height:1.6;font-size:14px}
+  .hint{font-size:12px;color:var(--ink-55);margin-top:6px;line-height:1.5}
+  .hint code{background:rgba(184,151,74,.1);padding:1px 5px;border-radius:4px;font-size:11.5px;color:var(--gold)}
+  .check-row{display:flex;align-items:center;gap:10px;margin-top:18px;font-size:14px}
+  .check-row input{width:18px;height:18px;accent-color:var(--gold)}
+  .form-actions{display:flex;gap:10px;margin-top:24px;flex-wrap:wrap;align-items:center}
+  .empty{text-align:center;padding:60px 24px;color:var(--ink-55);font-size:15px}
+  @media(max-width:680px){
+    main{padding:18px 14px 40px}.topbar{padding:10px 14px}.brand svg{height:44px}
+    .nav{flex-wrap:wrap;justify-content:flex-end;gap:2px}.nav a{padding:6px 9px;font-size:12px}.nav .sep{display:none}
+    .page-head h1{font-size:24px}.card{padding:18px 16px}
+    table,thead,tbody,tr,td{display:block;width:100%}thead{display:none}
+    tbody tr{padding:12px 4px;border-bottom:1px solid #eee8d9}tbody td{padding:3px 0;border:none}
+  }
+</style></head><body>
+<div class="topbar">
+  <a href="/admin" class="brand" aria-label="Columen Admin">
+    <svg viewBox="0 0 690 170" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="62" cy="84" r="43" fill="none" stroke="#ffffff" stroke-width="2.2"/>
+      <path d="M 92.3 68.6 A 34 34 0 1 0 92.3 99.4" fill="none" stroke="#6aacd6" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="92.3" cy="68.6" r="5" fill="#6aacd6"/>
+      <circle cx="92.3" cy="99.4" r="5" fill="#6aacd6"/>
+      <line x1="124" y1="42" x2="124" y2="128" stroke="#ffffff" stroke-width="1.4" opacity="0.5"/>
+      <text x="140" y="98" font-family="'Lora',Georgia,serif" font-size="56" font-weight="700" letter-spacing="5" fill="#ffffff">COLUMEN</text>
+      <text x="142" y="126" font-family="'Inter',sans-serif" font-size="14.5" font-weight="600" letter-spacing="5" fill="#ffffff">LEGAL &amp; NOTARIAL</text>
+    </svg>
+  </a>
+  <nav class="nav">
+    <a href="/admin">Consultas</a>
+    <a href="/admin/inbox">WhatsApp</a>
+    <a href="/admin/backup">Backup</a>
+    <a href="/admin/blog" class="active">Blog</a>
+    <span class="sep"></span>
+    <a href="/admin/logout" class="logout">Salir</a>
+  </nav>
+</div>
+<main>${inner}</main>
+</body></html>`;
+}
+
+app.get('/admin/blog', (req, res) => {
+  if (!isAuthenticated(req)) return res.redirect('/admin/login');
+  const csrf = ensureCsrfToken(req, res);
+  const posts = db.prepare('SELECT id, slug, title, published, created_at, updated_at FROM posts ORDER BY created_at DESC').all();
+  const rows = posts.map(p => `
+    <tr>
+      <td><strong>${escapeHtml(p.title)}</strong><div class="muted" style="font-size:12px;margin-top:2px">/blog/${escapeHtml(p.slug)}</div></td>
+      <td>${p.published ? '<span class="pill pub">Publicado</span>' : '<span class="pill draft">Borrador</span>'}</td>
+      <td class="muted">${escapeHtml((p.created_at || '').slice(0, 16))}</td>
+      <td>
+        <div class="row-actions">
+          ${p.published ? `<a href="/blog/${encodeURIComponent(p.slug)}" target="_blank">Ver</a>` : ''}
+          <a href="/admin/blog/${p.id}/edit">Editar</a>
+          <form method="POST" action="/admin/blog/${p.id}/delete" style="display:inline" onsubmit="return confirm('¿Eliminar \\u201C${escapeHtml(p.title).replace(/'/g, '')}\\u201D? Esta acción no se puede deshacer.')">
+            <input type="hidden" name="_csrf" value="${csrf}">
+            <button type="submit" class="del">Eliminar</button>
+          </form>
+        </div>
+      </td>
+    </tr>`).join('');
+  const inner = `
+  <div class="page-head">
+    <div>
+      <h1>Blog</h1>
+      <div class="lead">Artículos de columen.ar/blog. Los borradores no se publican hasta que los marques como publicados.</div>
+    </div>
+    <a class="btn" href="/admin/blog/new">+ Nueva entrada</a>
+  </div>
+  <div class="card">
+    ${posts.length
+      ? `<table><thead><tr><th>Artículo</th><th>Estado</th><th>Creado</th><th></th></tr></thead><tbody>${rows}</tbody></table>`
+      : '<div class="empty">Todavía no hay artículos.<br>Creá el primero con el botón <strong>+ Nueva entrada</strong>.</div>'}
+  </div>`;
+  res.send(adminBlogShell('Blog', inner, csrf));
+});
+
+function blogFormView(post, csrf, error) {
+  const p = post || { id: '', title: '', slug: '', excerpt: '', body: '', published: 0 };
+  return `
+  <div class="page-head">
+    <div>
+      <h1>${p.id ? 'Editar entrada' : 'Nueva entrada'}</h1>
+      <div class="lead">${p.id ? `Editando /blog/${escapeHtml(p.slug)}` : 'El artículo aparece en columen.ar/blog cuando lo marcás como publicado.'}</div>
+    </div>
+    <a class="btn ghost" href="/admin/blog">← Volver al listado</a>
+  </div>
+  ${error ? `<div class="card" style="border-color:#e8c8c0;background:#fdf6f4;color:#a3372a;font-size:13.5px">${escapeHtml(error)}</div>` : ''}
+  <div class="card">
+    <form method="POST" action="/admin/blog/save">
+      <input type="hidden" name="_csrf" value="${csrf}">
+      <input type="hidden" name="id" value="${p.id || ''}">
+      <label>Título *</label>
+      <input type="text" name="title" required maxlength="160" value="${escapeHtml(p.title)}" placeholder="Ej: ¿Cuánto tarda una sucesión en Mendoza?">
+      <label>URL (slug)</label>
+      <input type="text" name="slug" maxlength="120" value="${escapeHtml(p.slug)}" placeholder="se-genera-solo-desde-el-titulo">
+      <div class="hint">Dejalo vacío para generarlo automáticamente. Solo minúsculas, números y guiones.</div>
+      <label>Resumen (aparece en el listado y en Google)</label>
+      <input type="text" name="excerpt" maxlength="300" value="${escapeHtml(p.excerpt)}" placeholder="Una o dos frases que resuman el artículo.">
+      <label>Contenido *</label>
+      <textarea name="body" required placeholder="Escribí el artículo acá...">${escapeHtml(p.body)}</textarea>
+      <div class="hint">
+        Formato: <code>## Subtítulo</code> · <code>### Subtítulo menor</code> · <code>**negrita**</code> · <code>*cursiva*</code> · líneas con <code>- </code> para viñetas · <code>1. </code> para listas numeradas · <code>[texto](https://enlace)</code>. Párrafos separados por una línea en blanco.
+      </div>
+      <div class="check-row">
+        <input type="checkbox" name="published" id="pub" value="1" ${p.published ? 'checked' : ''}>
+        <label for="pub" style="margin:0;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink);font-weight:500">Publicado (visible en columen.ar/blog)</label>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn">Guardar</button>
+        <a class="btn ghost" href="/admin/blog">Cancelar</a>
+      </div>
+    </form>
+  </div>`;
+}
+
+app.get('/admin/blog/new', (req, res) => {
+  if (!isAuthenticated(req)) return res.redirect('/admin/login');
+  const csrf = ensureCsrfToken(req, res);
+  res.send(adminBlogShell('Nueva entrada', blogFormView(null, csrf), csrf));
+});
+
+app.get('/admin/blog/:id/edit', (req, res) => {
+  if (!isAuthenticated(req)) return res.redirect('/admin/login');
+  const csrf = ensureCsrfToken(req, res);
+  const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(parseInt(req.params.id, 10));
+  if (!post) return res.redirect('/admin/blog');
+  res.send(adminBlogShell('Editar entrada', blogFormView(post, csrf), csrf));
+});
+
+app.post('/admin/blog/save', requireCsrf, (req, res) => {
+  if (!isAuthenticated(req)) return res.redirect('/admin/login');
+  const { id, title, excerpt, body } = req.body || {};
+  let slug = (req.body?.slug || '').trim();
+  const published = req.body?.published ? 1 : 0;
+  const csrf = ensureCsrfToken(req, res);
+  const t = (title || '').trim();
+  const b = (body || '').trim();
+  if (!t || !b) {
+    return res.send(adminBlogShell('Blog', blogFormView({ id, title: t, slug, excerpt, body: b, published }, csrf, 'El título y el contenido son obligatorios.'), csrf));
+  }
+  slug = slug ? slugify(slug) : slugify(t);
+  if (!slug) slug = 'articulo-' + Date.now();
+  try {
+    if (id) {
+      db.prepare("UPDATE posts SET title=?, slug=?, excerpt=?, body=?, published=?, updated_at=datetime('now','localtime') WHERE id=?")
+        .run(t, slug, (excerpt || '').trim(), b, published, parseInt(id, 10));
+    } else {
+      db.prepare('INSERT INTO posts (title, slug, excerpt, body, published) VALUES (?,?,?,?,?)')
+        .run(t, slug, (excerpt || '').trim(), b, published);
+    }
+    snapshotDB('blog');
+    res.redirect('/admin/blog');
+  } catch (e) {
+    const msg = String(e.message).includes('UNIQUE')
+      ? `Ya existe un artículo con la URL "${slug}". Cambiá el slug.`
+      : 'Error guardando: ' + e.message;
+    res.send(adminBlogShell('Blog', blogFormView({ id, title: t, slug, excerpt, body: b, published }, csrf, msg), csrf));
+  }
+});
+
+app.post('/admin/blog/:id/delete', requireCsrf, (req, res) => {
+  if (!isAuthenticated(req)) return res.redirect('/admin/login');
+  db.prepare('DELETE FROM posts WHERE id = ?').run(parseInt(req.params.id, 10));
+  res.redirect('/admin/blog');
 });
 
 app.post('/admin/inbox/:tel/labels/:labelId', requireCsrf, (req, res) => {
@@ -1693,6 +1937,7 @@ app.get('/admin/inbox', (req, res) => {
     <a href="/admin">Consultas</a>
     <a href="/admin/inbox" class="active">WhatsApp</a>
     <a href="/admin/backup">Backup</a>
+    <a href="/admin/blog">Blog</a>
     <span class="sep"></span>
     <a href="/admin/logout" class="logout">Salir</a>
   </div>
@@ -3109,12 +3354,289 @@ app.get('/legales/aviso-legal', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'legales', 'aviso-legal.html'));
 });
 
+// --- Páginas de servicios (landing pages SEO con URL limpia) ---
+const SERVICE_PAGES = ['sucesiones-mendoza', 'escribania-notarial', 'contratos-fideicomisos'];
+for (const slug of SERVICE_PAGES) {
+  app.get('/' + slug, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'paginas', slug + '.html'));
+  });
+}
+
+// ============================================================
+// BLOG público — render del lado servidor con el mismo design system (site.css)
+// ============================================================
+
+// Mini-markdown seguro: escapa todo y después aplica formato básico.
+// Soporta: ## y ### títulos, **negrita**, *cursiva*, [texto](https://...), - viñetas, 1. listas, párrafos.
+function mdToHtml(md) {
+  const esc = escapeHtml(md || '');
+  const lines = esc.split(/\r?\n/);
+  const out = [];
+  let list = null; // 'ul' | 'ol' | null
+  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  const inline = (s) => s
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) { closeList(); continue; }
+    if (line.startsWith('### ')) { closeList(); out.push('<h3>' + inline(line.slice(4)) + '</h3>'); continue; }
+    if (line.startsWith('## ')) { closeList(); out.push('<h2>' + inline(line.slice(3)) + '</h2>'); continue; }
+    if (/^- /.test(line)) {
+      if (list !== 'ul') { closeList(); out.push('<ul>'); list = 'ul'; }
+      out.push('<li>' + inline(line.slice(2)) + '</li>'); continue;
+    }
+    if (/^\d+\. /.test(line)) {
+      if (list !== 'ol') { closeList(); out.push('<ol>'); list = 'ol'; }
+      out.push('<li>' + inline(line.replace(/^\d+\. /, '')) + '</li>'); continue;
+    }
+    closeList();
+    out.push('<p>' + inline(line) + '</p>');
+  }
+  closeList();
+  return out.join('\n');
+}
+
+function prettyFecha(iso) {
+  if (!iso) return '';
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return iso.slice(0, 10);
+  return `${d} de ${meses[m - 1]} de ${y}`;
+}
+
+const PUBLIC_SYMBOLS = `<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <symbol id="ico-wa" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.966-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></symbol>
+  <symbol id="logo-navy" viewBox="0 0 690 170" fill="none"><circle cx="62" cy="84" r="43" fill="none" stroke="#1a2744" stroke-width="2"/><path d="M 92.3 68.6 A 34 34 0 1 0 92.3 99.4" fill="none" stroke="#6aacd6" stroke-width="5.5" stroke-linecap="round"/><circle cx="92.3" cy="68.6" r="4.6" fill="#6aacd6"/><circle cx="92.3" cy="99.4" r="4.6" fill="#6aacd6"/><line x1="124" y1="42" x2="124" y2="128" stroke="#1a2744" stroke-width="1.2" opacity="0.35"/><text x="140" y="98" font-family="'Lora',Georgia,serif" font-size="56" font-weight="700" letter-spacing="5" fill="#1a2744">COLUMEN</text><text x="142" y="126" font-family="'Inter',sans-serif" font-size="14.5" font-weight="600" letter-spacing="5" fill="#1a2744">LEGAL &amp; NOTARIAL</text></symbol>
+  <symbol id="logo-m-navy" viewBox="0 0 380 90" fill="none"><circle cx="42" cy="45" r="28" fill="none" stroke="#1a2744" stroke-width="1.7"/><path d="M 61.95 35.02 A 22 22 0 1 0 61.95 54.98" fill="none" stroke="#6aacd6" stroke-width="3.8" stroke-linecap="round"/><circle cx="61.95" cy="35.02" r="3" fill="#6aacd6"/><circle cx="61.95" cy="54.98" r="3" fill="#6aacd6"/><line x1="82" y1="22" x2="82" y2="68" stroke="#1a2744" stroke-width="1" opacity="0.4"/><text x="96" y="58" font-family="'Lora',Georgia,serif" font-size="36" font-weight="700" letter-spacing="3.5" fill="#1a2744">COLUMEN</text></symbol>
+  <symbol id="logo" viewBox="0 0 690 170" fill="none"><circle cx="62" cy="84" r="43" fill="none" stroke="#ffffff" stroke-width="2"/><path d="M 92.3 68.6 A 34 34 0 1 0 92.3 99.4" fill="none" stroke="#6aacd6" stroke-width="5.5" stroke-linecap="round"/><circle cx="92.3" cy="68.6" r="4.6" fill="#6aacd6"/><circle cx="92.3" cy="99.4" r="4.6" fill="#6aacd6"/><line x1="124" y1="42" x2="124" y2="128" stroke="#ffffff" stroke-width="1.2" opacity="0.5"/><text x="140" y="98" font-family="'Lora',Georgia,serif" font-size="56" font-weight="700" letter-spacing="5" fill="#ffffff">COLUMEN</text><text x="142" y="126" font-family="'Inter',sans-serif" font-size="14.5" font-weight="600" letter-spacing="5" fill="#ffffff">LEGAL &amp; NOTARIAL</text></symbol>
+</svg>`;
+
+const WA_BLOG_LINK = 'https://wa.me/5492617571910?text=' + encodeURIComponent('Hola, leí un artículo del blog y quiero hacer una consulta');
+
+// Layout compartido de las páginas públicas server-rendered (blog)
+function publicPage({ title, description, canonical, content, jsonLd, ogType }) {
+  const ld = (jsonLd || []).map(o => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join('\n');
+  return `<!DOCTYPE html>
+<html lang="es-AR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>${escapeHtml(title)}</title>
+<meta name="description" content="${escapeHtml(description)}">
+<meta name="theme-color" content="#fffdf9">
+<link rel="canonical" href="${escapeHtml(canonical)}">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+<meta property="og:type" content="${ogType || 'website'}">
+<meta property="og:site_name" content="COLUMEN — Legal &amp; Notarial">
+<meta property="og:title" content="${escapeHtml(title)}">
+<meta property="og:description" content="${escapeHtml(description)}">
+<meta property="og:url" content="${escapeHtml(canonical)}">
+<meta property="og:image" content="https://columen.ar/og.png">
+<meta property="og:locale" content="es_AR">
+${ld}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site.css?v=5">
+</head>
+<body>
+${PUBLIC_SYMBOLS}
+<a href="#main" class="skip-link">Saltar al contenido</a>
+<header class="site">
+  <div class="container nav">
+    <a href="/" class="logo-wrap" aria-label="Columen — Inicio">
+      <svg class="logo-d" viewBox="0 0 690 170" xmlns="http://www.w3.org/2000/svg"><use href="#logo-navy"/></svg>
+      <svg class="logo-m" viewBox="0 0 380 90" xmlns="http://www.w3.org/2000/svg"><use href="#logo-m-navy"/></svg>
+    </a>
+    <nav aria-label="Navegación principal"><ul>
+      <li><a href="/#servicios">Servicios</a></li>
+      <li><a href="/#como">Cómo trabajamos</a></li>
+      <li><a href="/#equipo">Equipo</a></li>
+      <li><a href="/blog" aria-current="page">Blog</a></li>
+      <li><a href="/#contacto">Contacto</a></li>
+    </ul></nav>
+    <a href="${WA_BLOG_LINK}" target="_blank" rel="noopener" class="nav-cta">
+      <svg width="15" height="15" aria-hidden="true"><use href="#ico-wa"/></svg> Consulta
+    </a>
+    <button class="menu-btn" aria-label="Abrir menú" onclick="document.getElementById('mob-overlay').classList.add('open')">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+  </div>
+</header>
+<main id="main">
+${content}
+</main>
+<footer class="site">
+  <div class="container foot">
+    <a href="/" class="logo-wrap" aria-label="Columen — Inicio"><svg viewBox="5 0 405 170" xmlns="http://www.w3.org/2000/svg"><use href="#logo"/></svg></a>
+    <div class="foot-info">
+      <address class="foot-addr">
+        <span class="addr-line">Catamarca 170, Planta Baja, oficinas 8 y 10</span><span class="addr-sep"> · </span><span class="addr-line">Ciudad de Mendoza</span>
+      </address>
+      <div class="foot-hours"><span class="hours-line">Lunes a viernes · 9:00 a 18:00</span> <span class="hours-tz">hora Mendoza</span></div>
+      <div class="foot-legal"><a href="/blog">Blog</a> · <a href="/legales/privacidad">Política de privacidad</a> · <a href="/legales/aviso-legal">Aviso legal</a></div>
+      <div>© 2026 Columen Legal &amp; Notarial</div>
+    </div>
+  </div>
+</footer>
+<a href="${WA_BLOG_LINK}" target="_blank" rel="noopener" aria-label="Contactar por WhatsApp" class="wa-float">
+  <svg width="26" height="26" aria-hidden="true"><use href="#ico-wa"/></svg>
+</a>
+<div id="mob-overlay" class="mobile-overlay">
+  <div class="mobile-overlay-header">
+    <a href="/" class="logo-wrap"><svg viewBox="0 0 380 90" xmlns="http://www.w3.org/2000/svg"><use href="#logo-m-navy"/></svg></a>
+    <button class="mobile-close" aria-label="Cerrar menú" onclick="document.getElementById('mob-overlay').classList.remove('open')">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg>
+    </button>
+  </div>
+  <div class="mobile-overlay-body">
+    <ul>
+      <li><a href="/#servicios">Servicios</a></li>
+      <li><a href="/#como">Cómo trabajamos</a></li>
+      <li><a href="/#equipo">Equipo</a></li>
+      <li><a href="/blog">Blog</a></li>
+      <li><a href="/#contacto">Contacto</a></li>
+    </ul>
+  </div>
+  <div class="mobile-overlay-footer">
+    <a href="${WA_BLOG_LINK}" target="_blank" rel="noopener" class="btn btn-wa">
+      <svg width="17" height="17" aria-hidden="true"><use href="#ico-wa"/></svg> Escribinos por WhatsApp
+    </a>
+  </div>
+</div>
+</body>
+</html>`;
+}
+
+// Índice del blog
+app.get('/blog', (req, res) => {
+  const posts = db.prepare('SELECT slug, title, excerpt, created_at FROM posts WHERE published = 1 ORDER BY created_at DESC LIMIT 100').all();
+  const items = posts.map(p => `
+    <a class="post-item" href="/blog/${encodeURIComponent(p.slug)}">
+      <div class="post-date">${escapeHtml(prettyFecha(p.created_at))}</div>
+      <h2>${escapeHtml(p.title)}</h2>
+      ${p.excerpt ? `<p>${escapeHtml(p.excerpt)}</p>` : ''}
+      <span class="read-more">Leer artículo →</span>
+    </a>`).join('');
+  const content = `
+<div class="page-hero">
+  <div class="container">
+    <nav class="breadcrumb" aria-label="Ruta de navegación"><a href="/">Inicio</a><span class="sep">/</span><span>Blog</span></nav>
+    <h1>Blog <em class="it">legal y notarial.</em></h1>
+    <p class="lead">Artículos del equipo de Columen sobre sucesiones, contratos, escrituras y temas legales de interés, explicados en lenguaje claro.</p>
+  </div>
+</div>
+<div class="article">
+  <div class="container">
+    ${posts.length ? `<div class="post-list">${items}</div>` : '<div class="empty-blog">Pronto vas a encontrar artículos acá. Mientras tanto, escribinos por WhatsApp con tu consulta.</div>'}
+  </div>
+</div>`;
+  res.send(publicPage({
+    title: 'Blog legal y notarial — COLUMEN Mendoza',
+    description: 'Artículos sobre sucesiones, contratos, escrituras y temas legales en Argentina, escritos por los profesionales de Columen, estudio jurídico-notarial de Mendoza.',
+    canonical: 'https://columen.ar/blog',
+    content,
+    jsonLd: [{
+      '@context': 'https://schema.org',
+      '@type': 'Blog',
+      name: 'Blog de Columen — Legal & Notarial',
+      url: 'https://columen.ar/blog',
+      publisher: { '@type': 'LegalService', name: 'Columen — Estudio Legal & Notarial', url: 'https://columen.ar/' },
+    }],
+  }));
+});
+
+// Artículo individual
+app.get('/blog/:slug', (req, res) => {
+  const slug = String(req.params.slug || '');
+  if (!/^[a-z0-9-]{1,120}$/.test(slug)) return res.status(404).send('No encontrado');
+  const post = db.prepare('SELECT * FROM posts WHERE slug = ? AND published = 1').get(slug);
+  if (!post) return res.status(404).send(publicPage({
+    title: 'Artículo no encontrado — COLUMEN',
+    description: 'El artículo que buscás no existe o fue despublicado.',
+    canonical: 'https://columen.ar/blog',
+    content: `<div class="article"><div class="container"><div class="empty-blog">Este artículo no existe o fue despublicado.<br><br><a class="btn btn-navy" href="/blog">Volver al blog</a></div></div></div>`,
+  }));
+  const canonical = `https://columen.ar/blog/${post.slug}`;
+  const content = `
+<div class="page-hero">
+  <div class="container">
+    <nav class="breadcrumb" aria-label="Ruta de navegación"><a href="/">Inicio</a><span class="sep">/</span><a href="/blog">Blog</a><span class="sep">/</span><span>${escapeHtml(post.title)}</span></nav>
+    <h1>${escapeHtml(post.title)}</h1>
+    <p class="lead">${escapeHtml(post.excerpt || '')}</p>
+  </div>
+</div>
+<article class="article">
+  <div class="container">
+    <div class="prose">
+      <div class="post-meta"><span class="post-date">${escapeHtml(prettyFecha(post.created_at))}</span><span>·</span><span>Equipo Columen</span></div>
+      ${mdToHtml(post.body)}
+    </div>
+    <div class="article-cta">
+      <h2>¿Tenés una consulta sobre este tema?</h2>
+      <p>Escribinos por WhatsApp, contanos tu situación y te indicamos cómo abordarla. La primera orientación es gratuita.</p>
+      <a href="${WA_BLOG_LINK}" target="_blank" rel="noopener" class="btn btn-wa">
+        <svg width="17" height="17" aria-hidden="true"><use href="#ico-wa"/></svg> Consultar por WhatsApp
+      </a>
+    </div>
+  </div>
+</article>`;
+  res.send(publicPage({
+    title: `${post.title} — Blog COLUMEN`,
+    description: (post.excerpt || post.title).slice(0, 158),
+    canonical,
+    ogType: 'article',
+    content,
+    jsonLd: [
+      {
+        '@context': 'https://schema.org',
+        '@type': 'Article',
+        headline: post.title,
+        description: post.excerpt || '',
+        datePublished: (post.created_at || '').slice(0, 10),
+        dateModified: (post.updated_at || post.created_at || '').slice(0, 10),
+        mainEntityOfPage: canonical,
+        author: { '@type': 'Organization', name: 'Columen — Estudio Legal & Notarial', url: 'https://columen.ar/' },
+        publisher: { '@type': 'Organization', name: 'Columen — Estudio Legal & Notarial', logo: { '@type': 'ImageObject', url: 'https://columen.ar/og.png' } },
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Inicio', item: 'https://columen.ar/' },
+          { '@type': 'ListItem', position: 2, name: 'Blog', item: 'https://columen.ar/blog' },
+          { '@type': 'ListItem', position: 3, name: post.title, item: canonical },
+        ],
+      },
+    ],
+  }));
+});
+
 // --- SEO files ---
 app.get('/robots.txt', (req, res) => {
   res.type('text/plain').sendFile(path.join(__dirname, 'public', 'robots.txt'));
 });
+// Sitemap dinámico: home + páginas de servicios + blog + posts publicados
 app.get('/sitemap.xml', (req, res) => {
-  res.type('application/xml').sendFile(path.join(__dirname, 'public', 'sitemap.xml'));
+  const today = new Date().toISOString().slice(0, 10);
+  const urls = [
+    { loc: 'https://columen.ar/', priority: '1.0', lastmod: today },
+    ...SERVICE_PAGES.map(s => ({ loc: `https://columen.ar/${s}`, priority: '0.9', lastmod: today })),
+    { loc: 'https://columen.ar/blog', priority: '0.8', lastmod: today },
+  ];
+  try {
+    const posts = db.prepare('SELECT slug, created_at, updated_at FROM posts WHERE published = 1 ORDER BY created_at DESC').all();
+    for (const p of posts) {
+      urls.push({ loc: `https://columen.ar/blog/${p.slug}`, priority: '0.7', lastmod: (p.updated_at || p.created_at || '').slice(0, 10) || today });
+    }
+  } catch {}
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls.map(u => `  <url><loc>${u.loc}</loc><lastmod>${u.lastmod}</lastmod><priority>${u.priority}</priority></url>`).join('\n')}
+</urlset>`;
+  res.type('application/xml').send(xml);
 });
 
 // --- Health check (público, para EasyPanel/Cloudflare) ---
