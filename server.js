@@ -21,6 +21,9 @@ const {
 config.logConfigWarnings();
 
 const app = express();
+// Detrás del reverse proxy de EasyPanel: confiar en el primer proxy para que
+// req.ip / rate-limit / cookies Secure se comporten bien.
+app.set('trust proxy', 1);
 
 // Anonimiza teléfono para logs en producción (mantiene 4 últimos dígitos)
 function maskTel(tel) {
@@ -278,7 +281,10 @@ app.use(helmet({
 // --- Auth helpers ---
 function createSession() {
   const token = crypto.randomBytes(32).toString('hex');
-  db.prepare('INSERT INTO sessions (token) VALUES (?)').run(token);
+  // created_at explícito en UTC para que coincida con las comparaciones de
+  // expiración (datetime('now') es UTC). El DEFAULT de la tabla usaba
+  // 'localtime', lo que hacía expirar las sesiones ~3h antes en AR.
+  db.prepare("INSERT INTO sessions (token, created_at) VALUES (?, datetime('now'))").run(token);
   return token;
 }
 
@@ -360,6 +366,10 @@ const loginLimiter = rateLimit({
   max: parseInt(process.env.RATE_LIMIT_LOGIN_MAX || '5', 10),
   standardHeaders: true,
   legacyHeaders: false,
+  // Solo cuentan los intentos FALLIDOS. Así un login correcto nunca queda
+  // bloqueado aunque te hayas logueado/recargado varias veces en 15 min
+  // (era la causa de "a veces la contraseña anda y a veces no").
+  skipSuccessfulRequests: true,
   message: 'Demasiados intentos. Probá de nuevo en 15 minutos.',
 });
 
