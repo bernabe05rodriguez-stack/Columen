@@ -22,6 +22,21 @@ for (const d of [SESSION_DIR, MEDIA_DIR]) {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 }
 
+// Versión de WhatsApp Web a usar. whatsapp-web.js trae una fija que se queda vieja y
+// hace que WhatsApp cierre la sesión (LOGOUT) apenas se escanea el QR. La fijamos a una
+// actual, pero cargándola DESDE DISCO (vendored en src/wa/webcache/<version>.html) — sin
+// traer nada de un tercero en runtime. Para actualizarla: bajar el nuevo html a esa carpeta
+// (github.com/wppconnect-team/wa-version) y setear WA_WEB_VERSION. Cache writable en /data.
+const WA_WEB_VERSION = process.env.WA_WEB_VERSION || '2.3000.1043085068-alpha';
+const VENDORED_WEBCACHE = path.join(__dirname, 'webcache');
+const WEBCACHE_DIR = path.resolve(process.env.WA_WEBCACHE_DIR || path.join(DATA_ROOT, 'wa-webcache'));
+try {
+  if (!fs.existsSync(WEBCACHE_DIR)) fs.mkdirSync(WEBCACHE_DIR, { recursive: true });
+  const srcHtml = path.join(VENDORED_WEBCACHE, WA_WEB_VERSION + '.html');
+  const dstHtml = path.join(WEBCACHE_DIR, WA_WEB_VERSION + '.html');
+  if (fs.existsSync(srcHtml) && !fs.existsSync(dstHtml)) fs.copyFileSync(srcHtml, dstHtml);
+} catch (e) { console.error('[wa] no pude sembrar el webcache:', e.message); }
+
 // --- Estado observable por el panel ---
 // status: starting | qr | authenticating | ready | disconnected | auth_failure
 const state = {
@@ -88,6 +103,10 @@ function chromiumPath() {
 function buildClient() {
   const c = new Client({
     authStrategy: new LocalAuth({ dataPath: SESSION_DIR }),
+    // Fija una versión actual de WhatsApp Web (evita el LOGOUT instantáneo al escanear),
+    // cargada desde disco (vendored) — sin fetch a terceros en runtime.
+    webVersion: WA_WEB_VERSION,
+    webVersionCache: { type: 'local', path: WEBCACHE_DIR },
     puppeteer: {
       headless: true,
       executablePath: chromiumPath(),
