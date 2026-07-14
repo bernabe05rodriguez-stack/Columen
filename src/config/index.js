@@ -16,19 +16,13 @@ const ADMIN_PASS_HASH = process.env.ADMIN_PASS_HASH || '';
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.randomBytes(32).toString('hex');
 const RATE_LIMIT_LOGIN_MAX = parseInt(process.env.RATE_LIMIT_LOGIN_MAX || '5', 10);
 
-// Meta WhatsApp Cloud API
-const WA_TOKEN = process.env.WHATSAPP_TOKEN || '';
-const WA_PHONE_ID = process.env.WHATSAPP_PHONE_ID || '';
-const WA_VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'columen-verify-2026';
-const APP_SECRET = process.env.APP_SECRET || '';
-
-// Plantilla aprobada para reabrir ventana 24hs (UTILITY, sin variables)
-const RECONTACT_TEMPLATE_NAME = process.env.WHATSAPP_TEMPLATE_RECONTACT_NAME || 'columen_mensaje';
-const RECONTACT_TEMPLATE_LANG = process.env.WHATSAPP_TEMPLATE_RECONTACT_LANG || 'es_AR';
-const RECONTACT_TEMPLATE_PREVIEW = process.env.WHATSAPP_TEMPLATE_RECONTACT_PREVIEW || 'Buen día me comunico de Columen';
+// WhatsApp (whatsapp-web.js — sesión por QR con número propio, sin Meta Cloud API)
+const WA_SESSION_DIR = process.env.WA_SESSION_DIR || '';   // default lo resuelve src/wa/client.js
+const WA_MEDIA_DIR = process.env.WA_MEDIA_DIR || '';
+const CHROMIUM_PATH = process.env.CHROMIUM_PATH || '';
 
 // URLs
-const PUBLIC_URL = process.env.PUBLIC_URL || 'https://redhawk-columen.bm6z1s.easypanel.host';
+const PUBLIC_URL = process.env.PUBLIC_URL || 'https://columen.ar';
 
 // Backups off-site
 const BACKUP_OFFSITE_TOKEN = process.env.BACKUP_OFFSITE_TOKEN || '';
@@ -37,18 +31,15 @@ const BACKUP_OFFSITE_BRANCH = process.env.BACKUP_OFFSITE_BRANCH || 'main';
 
 // Validaciones soft (warns, no fail)
 function logConfigWarnings() {
-  if (!APP_SECRET) console.error('[config] APP_SECRET not set — webhook signature verification will FAIL');
   if (!ADMIN_PASS_HASH && !ADMIN_PASS) console.error('[config] No ADMIN_PASS_HASH or ADMIN_PASS configured — login disabled');
   if (!ADMIN_PASS_HASH && ADMIN_PASS) console.warn('[config] Using plaintext ADMIN_PASS fallback — set ADMIN_PASS_HASH (bcrypt) and remove ADMIN_PASS ASAP');
-  if (!WA_TOKEN) console.warn('[config] WHATSAPP_TOKEN not set — outbound messages will fail');
   if (!BACKUP_OFFSITE_TOKEN || !BACKUP_OFFSITE_REPO) console.warn('[config] Backup off-site disabled (missing BACKUP_OFFSITE_TOKEN or BACKUP_OFFSITE_REPO)');
 }
 
 module.exports = {
   NODE_ENV, IS_PROD, PORT,
   ADMIN_USER, ADMIN_PASS, ADMIN_PASS_HASH, SESSION_SECRET, RATE_LIMIT_LOGIN_MAX,
-  WA_TOKEN, WA_PHONE_ID, WA_VERIFY_TOKEN, APP_SECRET,
-  RECONTACT_TEMPLATE_NAME, RECONTACT_TEMPLATE_LANG, RECONTACT_TEMPLATE_PREVIEW,
+  WA_SESSION_DIR, WA_MEDIA_DIR, CHROMIUM_PATH,
   PUBLIC_URL,
   BACKUP_OFFSITE_TOKEN, BACKUP_OFFSITE_REPO, BACKUP_OFFSITE_BRANCH,
   logConfigWarnings,
