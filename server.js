@@ -3688,12 +3688,16 @@ function shutdown(sig) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[shutdown] ${sig} recibido, cerrando…`);
-  const force = setTimeout(() => { console.error('[shutdown] timeout, forzando exit'); process.exit(1); }, 10000);
-  server.close(() => {
-    try { db.close(); } catch {}
-    clearTimeout(force);
-    console.log('[shutdown] cerrado limpio');
-    process.exit(0);
+  const force = setTimeout(() => { console.error('[shutdown] timeout, forzando exit'); process.exit(1); }, 15000);
+  // Cerrar WhatsApp limpio PRIMERO (flushea la sesión al disco para que sobreviva el redeploy),
+  // después drenar el server y cerrar la DB.
+  wa.close().catch(() => {}).finally(() => {
+    server.close(() => {
+      try { db.close(); } catch {}
+      clearTimeout(force);
+      console.log('[shutdown] cerrado limpio');
+      process.exit(0);
+    });
   });
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));

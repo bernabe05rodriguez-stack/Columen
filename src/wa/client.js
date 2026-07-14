@@ -171,10 +171,11 @@ function buildClient() {
     state.lastError = String(reason);
     console.warn('[wa] desconectado:', reason);
     if (relinking) return; // un relink/logout maneja su propia reinicialización
-    // Si nunca se autenticó (sesión parcial/podrida), limpiarla para que el rebuild
-    // muestre un QR nuevo en vez de loopear en 'disconnected'. Si la sesión SÍ era
-    // válida (authedOnce), se preserva y solo se reconecta.
-    const wipe = !authedOnce && !everReady;
+    // Solo limpiar la sesión si WhatsApp la cerró DE VERDAD (LOGOUT/UNPAIRED/CONFLICT):
+    // ahí la sesión ya no sirve y hay que mostrar QR nuevo. En cortes transitorios (red,
+    // navegación, reinicio del contenedor) se PRESERVA y solo se reconecta — así la sesión
+    // sobrevive a los redeploys. (Si igual quedó rota, el supervisor la limpia tras 2 fallos.)
+    const wipe = /LOGOUT|UNPAIRED|CONFLICT/i.test(String(reason || ''));
     everReady = false;
     setTimeout(() => { start({ wipe }).catch(e => console.error('[wa] auto-reconnect fail', e.message)); }, 6000);
   });
@@ -359,6 +360,19 @@ async function reconnect() {
   await start();
 }
 
+// Cierre limpio: destruye el navegador para que whatsapp-web.js flushee la sesión al
+// disco antes de que muera el contenedor. CLAVE para que la sesión sobreviva a los
+// redeploys (si el contenedor se mata en seco, la sesión queda a medio guardar → logout).
+async function close() {
+  relinking = true; // frena la auto-reconexión durante el cierre
+  try {
+    if (client) await Promise.race([
+      client.destroy(),
+      new Promise((r) => setTimeout(r, 6000)), // no colgar el shutdown más de 6s
+    ]);
+  } catch (e) { console.error('[wa] close error', e.message); }
+}
+
 // Cierra sesión (desvincula el número) y vuelve a mostrar QR para escanear otro.
 async function relink() {
   relinking = true;
@@ -385,6 +399,6 @@ module.exports = {
   init, getState,
   sendText, sendMedia, resolveNumber, requestPairingCode,
   saveIncomingMedia, saveBase64, mediaPath,
-  reconnect, relink,
+  reconnect, relink, close,
   MEDIA_DIR, SESSION_DIR,
 };
