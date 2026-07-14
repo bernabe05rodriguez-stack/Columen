@@ -3627,7 +3627,21 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 
 // Arranca la sesión de WhatsApp (whatsapp-web.js). El QR se muestra en /admin/conexion.
-wa.init({ onMessage: handleIncoming, onAck: handleAck });
+// Blindado: cualquier fallo al iniciar WhatsApp NO debe tumbar el server (la landing y
+// el /admin tienen que seguir funcionando aunque WhatsApp no conecte).
+try {
+  wa.init({ onMessage: handleIncoming, onAck: handleAck });
+} catch (e) {
+  console.error('[wa] init lanzó una excepción (el server sigue igual):', e.message);
+}
+// Red de seguridad global: un rechazo no manejado del stack de WhatsApp/puppeteer
+// no debe crashear el proceso.
+process.on('unhandledRejection', (reason) => {
+  console.error('[proc] unhandledRejection:', reason && reason.message ? reason.message : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[proc] uncaughtException:', err && err.message ? err.message : err);
+});
 
 // Graceful shutdown — drena conexiones, cierra DB, exit limpio
 let shuttingDown = false;
