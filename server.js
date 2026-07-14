@@ -3526,38 +3526,35 @@ app.get('/admin/conexion', (req, res) => {
   .nav a:hover{background:rgba(255,255,255,.08);color:#fff}
   .nav a.active{background:var(--gold);color:#fff}
   .nav a.logout{color:#e6b8b8}
-  main{max-width:640px;margin:0 auto;padding:34px 18px 60px}
-  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:30px 26px;box-shadow:0 10px 30px -18px rgba(26,39,68,.35)}
-  h1{font-family:'Lora',serif;font-size:26px;margin-bottom:6px}
-  .sub{color:#6b6455;font-size:14px;margin-bottom:24px}
-  .statusbox{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:12px;background:var(--paper);border:1px solid var(--line);margin-bottom:22px}
-  .dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;box-shadow:0 0 0 4px rgba(0,0,0,.04)}
+  main{max-width:500px;margin:0 auto;padding:44px 18px 60px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:36px 30px;box-shadow:0 12px 34px -18px rgba(26,39,68,.4);text-align:center}
+  h1{font-family:'Lora',serif;font-size:23px;margin-bottom:18px}
+  .status{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:14.5px;padding:7px 16px;border-radius:999px;background:var(--paper);border:1px solid var(--line);margin-bottom:26px}
+  .dot{width:11px;height:11px;border-radius:50%}
   .dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
-  .st-label{font-weight:600;font-size:16px}
-  .st-meta{font-size:13px;color:#6b6455;margin-top:2px}
-  .qrwrap{text-align:center;padding:10px 0 4px}
-  .qrwrap img{width:288px;height:288px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:8px}
-  .qrwrap p{margin-top:14px;font-size:14px;color:#4a4636;max-width:420px;margin-inline:auto;line-height:1.5}
-  .steps{font-size:13.5px;color:#6b6455;margin:14px auto 0;max-width:430px;text-align:left;line-height:1.7}
-  .num{display:inline-block;width:22px;height:22px;line-height:22px;text-align:center;border-radius:50%;background:var(--gold);color:#fff;font-size:12px;font-weight:700;margin-right:8px}
-  .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
-  .btn{border:0;border-radius:9px;padding:11px 18px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+  .qr{width:256px;height:256px;border:1px solid var(--line);border-radius:16px;background:#fff;padding:10px;margin:0 auto;display:none}
+  .spin{color:#8a8272;font-size:14px;padding:108px 0}
+  .steps{list-style:none;max-width:320px;margin:24px auto 0;text-align:left;display:grid;gap:13px}
+  .steps li{display:flex;align-items:center;gap:12px;font-size:14.5px;line-height:1.35}
+  .steps .n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .alt{margin-top:24px}
+  .alt a{color:var(--gold);font-size:13px;font-weight:500;cursor:pointer;text-decoration:none}
+  .alt a:hover{text-decoration:underline}
+  .pair{display:none;margin-top:16px}
+  .pair.open{display:block}
+  #pairNum{width:100%;max-width:320px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit;outline:none;margin-bottom:10px;text-align:center}
+  #pairNum:focus{border-color:var(--gold2)}
+  .code{font-family:'Lora',serif;font-size:30px;letter-spacing:5px;font-weight:700;color:var(--navy);background:var(--paper);border:1px dashed var(--gold2);border-radius:12px;padding:14px;margin:12px auto 0;max-width:300px}
+  .err{color:var(--bad);font-size:13px}
+  .check{font-size:52px;line-height:1}
+  .cnum{font-family:'Lora',serif;font-size:24px;margin-top:12px}
+  .csub{color:#6b6455;font-size:14px;margin-top:6px}
+  .btn{border:0;border-radius:10px;padding:12px 22px;font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit}
   .btn.primary{background:var(--navy);color:#fff}
   .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--navy)}
-  .btn.danger{background:#fff;border:1px solid #e2c4c4;color:var(--bad)}
   .btn:disabled{opacity:.5;cursor:not-allowed}
-  .hint{font-size:12.5px;color:#8a8272;margin-top:16px;line-height:1.5}
-  .connected{text-align:center;padding:8px 0}
-  .connected .big{font-size:40px}
-  .connected .numline{font-family:'Lora',serif;font-size:22px;margin-top:6px}
-  .divider{text-align:center;color:#9a927e;font-size:12.5px;margin:22px 0 14px;letter-spacing:.3px}
-  .pairbox{text-align:center}
-  #pairNum{width:100%;max-width:360px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font-size:15px;font-family:inherit;outline:none;margin-bottom:10px}
-  #pairNum:focus{border-color:var(--gold2)}
-  .pairhint{font-size:12px;color:#8a8272;margin-top:10px;line-height:1.5;max-width:430px;margin-inline:auto}
-  .code{font-family:'Lora',serif;font-size:30px;letter-spacing:6px;font-weight:700;color:var(--navy);background:var(--paper);border:1px dashed var(--gold2);border-radius:10px;padding:12px;margin:14px auto 4px;max-width:300px}
-  .codehint{font-size:12.5px;color:#6b6455}
-  .err{color:var(--bad);font-size:13px}
+  .unlink{display:inline-block;margin-top:26px;color:#b06a6a;font-size:13px;cursor:pointer;text-decoration:none}
+  .unlink:hover{text-decoration:underline;color:var(--bad)}
 </style></head>
 <body>
 <div class="topbar">
@@ -3573,96 +3570,77 @@ app.get('/admin/conexion', (req, res) => {
 </div>
 <main>
   <div class="card">
-    <h1>Conexión de WhatsApp</h1>
-    <p class="sub">Vinculá el WhatsApp del estudio escaneando el código QR. Un solo número a la vez.</p>
-    <div class="statusbox">
-      <span class="dot warn" id="dot"></span>
-      <div>
-        <div class="st-label" id="stLabel">Cargando…</div>
-        <div class="st-meta" id="stMeta"></div>
-      </div>
-    </div>
+    <h1>WhatsApp del estudio</h1>
+    <div class="status"><span class="dot warn" id="dot"></span><span id="stLabel">Cargando…</span></div>
+
     <div id="qrPanel" style="display:none">
-      <div class="qrwrap">
-        <img id="qrImg" src="" alt="QR de WhatsApp" style="display:none">
-        <div id="qrSpin" class="sub">Generando código QR…</div>
-        <div class="steps">
-          <div><span class="num">1</span>Abrí WhatsApp en el teléfono</div>
-          <div><span class="num">2</span>Tocá Menú (⋮) o Ajustes → <b>Dispositivos vinculados</b></div>
-          <div><span class="num">3</span>Tocá <b>Vincular un dispositivo</b> y escaneá el código de arriba</div>
-        </div>
-      </div>
-      <div class="divider">— o vinculá con tu número de teléfono —</div>
-      <div class="pairbox">
-        <input id="pairNum" type="text" inputmode="numeric" placeholder="Número con código de país (ej: 5492617571910)">
+      <img class="qr" id="qrImg" src="" alt="Código QR">
+      <div class="spin" id="qrSpin">Generando código…</div>
+      <ol class="steps">
+        <li><span class="n">1</span>Abrí WhatsApp › <b>Dispositivos vinculados</b></li>
+        <li><span class="n">2</span>Tocá <b>Vincular un dispositivo</b></li>
+        <li><span class="n">3</span>Escaneá el código de arriba</li>
+      </ol>
+      <div class="alt"><a id="altToggle">¿No podés escanear? Vinculá con tu número →</a></div>
+      <div class="pair" id="pairBox">
+        <input id="pairNum" type="text" inputmode="numeric" placeholder="Ej: 5492617571910">
         <button class="btn ghost" id="btnPair">Obtener código</button>
         <div id="pairResult"></div>
-        <p class="pairhint">En WhatsApp: Dispositivos vinculados → Vincular un dispositivo → <b>Vincular con número de teléfono</b> → ingresá el código de 8 caracteres.</p>
       </div>
     </div>
-    <div id="connPanel" style="display:none"></div>
-    <div id="waitPanel" class="sub" style="display:none"></div>
-    <div class="actions" id="actions"></div>
-    <p class="hint">⚠️ WhatsApp no-oficial: usá el número dedicado al estudio. Si el teléfono queda mucho tiempo sin internet, puede pedir volver a vincular.</p>
+
+    <div id="connPanel" style="display:none">
+      <div class="check">✅</div>
+      <div class="cnum" id="connNum"></div>
+      <div class="csub">Conectado y activo</div>
+      <a class="unlink" id="btnRelink">Desvincular</a>
+    </div>
+
+    <div id="waitPanel" style="display:none">
+      <div class="spin" id="waitTxt">Conectando…</div>
+      <button class="btn primary" id="btnReconnect">Reintentar</button>
+    </div>
   </div>
 </main>
 <script>
+  function $(id){ return document.getElementById(id); }
   function csrf(){ return (document.cookie.match(/(?:^|; )csrf=([^;]+)/)||[])[1]||''; }
   function postJSON(url, body){ return fetch(url,{method:'POST',headers:{'X-CSRF-Token':csrf(),'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}); }
-  function fmt(iso){ if(!iso) return '—'; try{ return new Date(iso).toLocaleString('es-AR',{timeZone:'America/Argentina/Buenos_Aires'}); }catch(e){ return iso; } }
   var DOT={ready:'ok',qr:'warn',authenticating:'warn',starting:'warn',disconnected:'bad',auth_failure:'bad'};
-  var LABEL={ready:'Conectado',qr:'Escaneá el QR o vinculá con tu número',authenticating:'Conectando…',starting:'Iniciando…',disconnected:'Desconectado',auth_failure:'Error de autenticación'};
+  var LABEL={ready:'Conectado',qr:'Escaneá para vincular',authenticating:'Conectando…',starting:'Iniciando…',disconnected:'Sin conexión',auth_failure:'Error'};
   var mode='', qrV=-1;
-  var qrPanel=document.getElementById('qrPanel'), connPanel=document.getElementById('connPanel'), waitPanel=document.getElementById('waitPanel'), actions=document.getElementById('actions');
-  var qrImg=document.getElementById('qrImg'), qrSpin=document.getElementById('qrSpin');
+  var qrImg=$('qrImg'), qrSpin=$('qrSpin');
 
-  document.getElementById('btnPair').onclick=async function(){
-    var n=document.getElementById('pairNum').value.replace(/[^\\d]/g,'');
-    var out=document.getElementById('pairResult');
-    if(n.length<8){ out.innerHTML='<span class="err">Ingresá el número con código de país (ej: 5492617571910).</span>'; return; }
-    this.disabled=true; this.textContent='Generando…';
-    try{
-      var j=await (await postJSON('/admin/conexion/pair',{number:n})).json();
-      if(j.ok && j.code){ out.innerHTML='<div class="code">'+j.code+'</div><div class="codehint">Ingresá este código en WhatsApp.</div>'; }
-      else{ out.innerHTML='<span class="err">'+(j.error||'No se pudo generar el código')+'</span>'; }
-    }catch(e){ out.innerHTML='<span class="err">Error de red, probá de nuevo</span>'; }
-    this.disabled=false; this.textContent='Obtener código';
+  $('altToggle').onclick=function(){ $('pairBox').classList.toggle('open'); };
+  $('btnPair').onclick=async function(){
+    var n=$('pairNum').value.replace(/[^\\d]/g,''); var out=$('pairResult'); var b=this;
+    if(n.length<8){ out.innerHTML='<span class="err">Ingresá el número con código de país.</span>'; return; }
+    b.disabled=true; b.textContent='…';
+    try{ var j=await (await postJSON('/admin/conexion/pair',{number:n})).json();
+      out.innerHTML = (j.ok&&j.code) ? '<div class="code">'+j.code+'</div>' : '<span class="err">'+(j.error||'No se pudo')+'</span>';
+    }catch(e){ out.innerHTML='<span class="err">Error de red</span>'; }
+    b.disabled=false; b.textContent='Obtener código';
   };
+  $('btnRelink').onclick=async function(){ if(!confirm('¿Desvincular este WhatsApp? Vas a tener que vincular de nuevo.'))return; this.textContent='Desvinculando…'; await postJSON('/admin/conexion/relink'); mode=''; };
+  $('btnReconnect').onclick=async function(){ var b=this; b.disabled=true; b.textContent='…'; await postJSON('/admin/conexion/reconnect'); mode=''; setTimeout(function(){ b.disabled=false; b.textContent='Reintentar'; },2500); };
 
   async function tick(){
     var s; try{ s=await (await fetch('/admin/conexion/status')).json(); }catch(e){ return; }
-    document.getElementById('dot').className='dot '+(DOT[s.status]||'warn');
-    document.getElementById('stLabel').textContent=LABEL[s.status]||s.status;
-    var meta=[]; if(s.info&&s.info.number) meta.push('Número: +'+s.info.number); if(s.lastReadyAt&&s.status==='ready') meta.push('Desde '+fmt(s.lastReadyAt));
-    if(s.status!=='ready'&&s.lastError) meta.push(String(s.lastError).slice(0,80));
-    document.getElementById('stMeta').textContent=meta.join(' · ');
-
-    var newMode = s.status==='ready' ? 'ready' : (s.status==='qr' ? 'qr' : 'wait');
-    if(newMode!==mode){
-      mode=newMode; qrV=-1;
-      qrPanel.style.display = mode==='qr' ? 'block':'none';
-      connPanel.style.display = mode==='ready' ? 'block':'none';
-      waitPanel.style.display = mode==='wait' ? 'block':'none';
-      if(mode==='ready'){
-        connPanel.innerHTML='<div class="connected"><div class="big">✅</div><div class="numline">+'+((s.info&&s.info.number)||'')+'</div><p class="sub" style="margin-top:8px">'+((s.info&&s.info.pushname)?('“'+s.info.pushname+'”'):'')+' vinculado y activo.</p></div>';
-        actions.innerHTML='<button class="btn danger" id="btnRelink">Desvincular / cambiar de número</button>';
-      } else if(mode==='wait'){
-        waitPanel.textContent = s.status==='authenticating' ? 'Cargando la sesión, aguardá unos segundos…' : 'Esperando conexión con WhatsApp…';
-        actions.innerHTML='<button class="btn primary" id="btnReconnect">Reconectar ahora</button>';
-      } else {
-        actions.innerHTML='<button class="btn ghost" id="btnReconnect">Reiniciar el código</button>';
-      }
-      bindActions();
+    $('dot').className='dot '+(DOT[s.status]||'warn');
+    $('stLabel').textContent=LABEL[s.status]||s.status;
+    var m = s.status==='ready' ? 'ready' : (s.status==='qr' ? 'qr' : 'wait');
+    if(m!==mode){
+      mode=m; qrV=-1;
+      $('qrPanel').style.display = m==='qr' ? 'block':'none';
+      $('connPanel').style.display = m==='ready' ? 'block':'none';
+      $('waitPanel').style.display = m==='wait' ? 'block':'none';
+      if(m==='ready'){ $('connNum').textContent = (s.info&&s.info.number) ? '+'+s.info.number : ''; }
+      if(m==='wait'){ $('waitTxt').textContent = s.status==='authenticating' ? 'Cargando la sesión…' : 'Conectando…'; }
     }
-    // Refresca SOLO la imagen del QR cuando llega uno nuevo (el QR rota cada ~20-30s).
-    if(mode==='qr'){
+    if(m==='qr'){
       if(s.qrDataUrl && s.qrVersion!==qrV){ qrV=s.qrVersion; qrImg.src=s.qrDataUrl; qrImg.style.display='block'; qrSpin.style.display='none'; }
       else if(!s.qrDataUrl){ qrImg.style.display='none'; qrSpin.style.display='block'; }
     }
-  }
-  function bindActions(){
-    var br=document.getElementById('btnRelink'); if(br) br.onclick=async function(){ if(!confirm('¿Desvincular el WhatsApp actual? Vas a tener que vincular de nuevo.'))return; br.disabled=true; br.textContent='Desvinculando…'; await postJSON('/admin/conexion/relink'); mode=''; };
-    var bc=document.getElementById('btnReconnect'); if(bc) bc.onclick=async function(){ bc.disabled=true; bc.textContent='…'; await postJSON('/admin/conexion/reconnect'); setTimeout(function(){mode='';},1500); };
   }
   tick(); setInterval(tick,3000);
 </script>
