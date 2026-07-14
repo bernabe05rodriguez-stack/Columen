@@ -40,6 +40,21 @@ let client = null;
 let callbacks = { onMessage: null, onAck: null };
 let relinking = false;
 let lastQrString = null;
+let everReady = false;  // ¿alguna vez llegó a estar conectado en esta corrida?
+let authedOnce = false; // ¿la sesión guardada llegó a autenticarse alguna vez?
+
+// Borra el contenido de la carpeta de sesión (fuerza un QR nuevo). Se usa cuando
+// la sesión guardada quedó parcial/corrupta (mostró QR pero nunca se autenticó),
+// que si no provoca un loop de 'disconnected' al reintentar restaurarla.
+function wipeSession() {
+  try {
+    if (!fs.existsSync(SESSION_DIR)) return;
+    for (const f of fs.readdirSync(SESSION_DIR)) {
+      try { fs.rmSync(path.join(SESSION_DIR, f), { recursive: true, force: true }); } catch {}
+    }
+    console.log('[wa] sesión limpiada — se generará un QR nuevo');
+  } catch (e) { console.error('[wa] wipeSession error', e.message); }
+}
 
 function getState() {
   return {
@@ -103,6 +118,7 @@ function buildClient() {
 
   c.on('loading_screen', (percent) => { state.status = 'authenticating'; });
   c.on('authenticated', () => {
+    authedOnce = true; // la sesión guardada es válida → nunca la borres por un blip
     state.status = 'authenticating';
     state.qrDataUrl = null;
     console.log('[wa] autenticado, cargando sesión…');
@@ -115,6 +131,7 @@ function buildClient() {
 
   c.on('ready', () => {
     state.status = 'ready';
+    everReady = true;
     state.qrDataUrl = null;
     state.pairingCode = null;
     state.lastReadyAt = new Date().toISOString();
@@ -135,8 +152,12 @@ function buildClient() {
     state.lastError = String(reason);
     console.warn('[wa] desconectado:', reason);
     if (relinking) return; // un relink/logout maneja su propia reinicialización
-    // Auto-reconexión: destruye y reconstruye tras unos segundos.
-    setTimeout(() => { rebuild().catch(e => console.error('[wa] auto-reconnect fail', e.message)); }, 6000);
+    // Si nunca se autenticó (sesión parcial/podrida), limpiarla para que el rebuild
+    // muestre un QR nuevo en vez de loopear en 'disconnected'. Si la sesión SÍ era
+    // válida (authedOnce), se preserva y solo se reconecta.
+    const wipe = !authedOnce && !everReady;
+    everReady = false;
+    setTimeout(() => { rebuild({ wipe }).catch(e => console.error('[wa] auto-reconnect fail', e.message)); }, 6000);
   });
 
   c.on('message', async (msg) => {
@@ -157,11 +178,13 @@ function buildClient() {
   return c;
 }
 
-// Destruye el cliente actual (si hay) y arranca uno nuevo con la misma sesión.
-async function rebuild() {
+// Destruye el cliente actual (si hay) y arranca uno nuevo. Con { wipe:true }
+// borra la sesión guardada antes (para forzar un QR nuevo).
+async function rebuild({ wipe } = {}) {
   if (client) {
     try { await client.destroy(); } catch {}
   }
+  if (wipe) { wipeSession(); authedOnce = false; }
   client = buildClient();
   await client.initialize();
 }
@@ -297,6 +320,9 @@ async function relink() {
       try { await client.logout(); } catch (e) { console.warn('[wa] logout warn', e.message); }
       try { await client.destroy(); } catch {}
     }
+    everReady = false;
+    authedOnce = false;
+    wipeSession(); // garantiza QR nuevo al cambiar de número
     state.status = 'starting';
     state.info = null;
     state.qrDataUrl = null;
