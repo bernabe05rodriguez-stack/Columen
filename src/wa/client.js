@@ -157,7 +157,7 @@ function buildClient() {
     // válida (authedOnce), se preserva y solo se reconecta.
     const wipe = !authedOnce && !everReady;
     everReady = false;
-    setTimeout(() => { rebuild({ wipe }).catch(e => console.error('[wa] auto-reconnect fail', e.message)); }, 6000);
+    setTimeout(() => { start({ wipe }).catch(e => console.error('[wa] auto-reconnect fail', e.message)); }, 6000);
   });
 
   c.on('message', async (msg) => {
@@ -178,28 +178,55 @@ function buildClient() {
   return c;
 }
 
-// Destruye el cliente actual (si hay) y arranca uno nuevo. Con { wipe:true }
-// borra la sesión guardada antes (para forzar un QR nuevo).
-async function rebuild({ wipe } = {}) {
-  if (client) {
-    try { await client.destroy(); } catch {}
+// Chromium deja archivos de lock (SingletonLock/Cookie/Socket) en el perfil cuando
+// el proceso muere sucio (ej: el contenedor lo matan en un redeploy). En el próximo
+// arranque esos locks impiden que el navegador levante y initialize() rechaza. Los
+// borramos antes de cada arranque — son seguros de eliminar.
+function cleanChromiumLocks() {
+  try {
+    const stack = [SESSION_DIR];
+    while (stack.length) {
+      const dir = stack.pop();
+      let entries;
+      try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+      for (const e of entries) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) stack.push(p);
+        else if (/^Singleton(Lock|Cookie|Socket)$/.test(e.name)) { try { fs.rmSync(p, { force: true }); } catch {} }
+      }
+    }
+  } catch {}
+}
+
+let launchFails = 0;
+
+// Supervisor del cliente: arranca/reinicia y NUNCA se rinde. Con { wipe:true } borra
+// la sesión guardada antes (fuerza QR nuevo). Ante fallo de arranque, reintenta y a
+// los 2 fallos seguidos limpia toda la sesión (salvo que ya haya sido válida).
+async function start({ wipe } = {}) {
+  if (relinking) return;
+  try {
+    if (client) { try { await client.destroy(); } catch {} }
+    if (wipe) { wipeSession(); authedOnce = false; }
+    cleanChromiumLocks();
+    client = buildClient();
+    await client.initialize();
+    launchFails = 0;
+  } catch (e) {
+    launchFails++;
+    state.status = 'disconnected';
+    state.lastError = e.message;
+    console.error('[wa] initialize falló (intento ' + launchFails + '):', e.message);
+    const wipeNext = launchFails >= 2 && !authedOnce;
+    setTimeout(() => { start({ wipe: wipeNext }).catch(() => {}); }, 6000);
   }
-  if (wipe) { wipeSession(); authedOnce = false; }
-  client = buildClient();
-  await client.initialize();
 }
 
 function init({ onMessage, onAck } = {}) {
   callbacks.onMessage = onMessage || null;
   callbacks.onAck = onAck || null;
   if (client) return client;
-  client = buildClient();
-  client.initialize().catch(e => {
-    state.status = 'disconnected';
-    state.lastError = e.message;
-    console.error('[wa] init error:', e.message);
-    setTimeout(() => { rebuild().catch(() => {}); }, 8000);
-  });
+  start().catch(() => {}); // el supervisor crea el client, lo inicializa y reintenta solo
   return client;
 }
 
@@ -309,7 +336,8 @@ function mediaPath(fileId) {
 
 // --- Acciones del panel ---
 async function reconnect() {
-  await rebuild();
+  launchFails = 0;
+  await start();
 }
 
 // Cierra sesión (desvincula el número) y vuelve a mostrar QR para escanear otro.
@@ -320,18 +348,18 @@ async function relink() {
       try { await client.logout(); } catch (e) { console.warn('[wa] logout warn', e.message); }
       try { await client.destroy(); } catch {}
     }
-    everReady = false;
-    authedOnce = false;
-    wipeSession(); // garantiza QR nuevo al cambiar de número
-    state.status = 'starting';
-    state.info = null;
-    state.qrDataUrl = null;
-    state.pairingCode = null;
-    client = buildClient();
-    await client.initialize();
   } finally {
-    relinking = false;
+    relinking = false; // liberar antes de que el supervisor arranque
   }
+  everReady = false;
+  authedOnce = false;
+  launchFails = 0;
+  wipeSession(); // garantiza QR nuevo al cambiar de número
+  state.status = 'starting';
+  state.info = null;
+  state.qrDataUrl = null;
+  state.pairingCode = null;
+  await start({ wipe: false }); // ya limpiamos; start hace cleanChromiumLocks + build + init + reintentos
 }
 
 module.exports = {
