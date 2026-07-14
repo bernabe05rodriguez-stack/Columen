@@ -27,6 +27,8 @@ for (const d of [SESSION_DIR, MEDIA_DIR]) {
 const state = {
   status: 'starting',
   qrDataUrl: null,        // data:image/png cuando status === 'qr'
+  qrVersion: 0,           // se incrementa en cada QR nuevo (el QR rota cada ~20-30s)
+  pairingCode: null,      // código de 8 chars para vincular con número (método alternativo)
   info: null,             // { number, pushname, platform }
   lastReadyAt: null,
   lastDisconnectAt: null,
@@ -37,11 +39,14 @@ const state = {
 let client = null;
 let callbacks = { onMessage: null, onAck: null };
 let relinking = false;
+let lastQrString = null;
 
 function getState() {
   return {
     status: state.status,
     qrDataUrl: state.qrDataUrl,
+    qrVersion: state.qrVersion,
+    pairingCode: state.pairingCode,
     info: state.info,
     lastReadyAt: state.lastReadyAt,
     lastDisconnectAt: state.lastDisconnectAt,
@@ -85,13 +90,15 @@ function buildClient() {
   c.on('qr', async (qr) => {
     state.status = 'qr';
     state.info = null;
+    lastQrString = qr; // guardado por si se pide un código de emparejamiento
     try {
       state.qrDataUrl = await qrcode.toDataURL(qr, { margin: 1, width: 320 });
+      state.qrVersion++; // avisa al panel que hay un QR nuevo → refresca solo la imagen
     } catch (e) {
       state.qrDataUrl = null;
       console.error('[wa] no pude renderizar el QR', e.message);
     }
-    console.log('[wa] QR listo — escaneá desde /admin/conexion');
+    console.log('[wa] QR nuevo (v' + state.qrVersion + ') — escaneá desde /admin/conexion');
   });
 
   c.on('loading_screen', (percent) => { state.status = 'authenticating'; });
@@ -109,6 +116,7 @@ function buildClient() {
   c.on('ready', () => {
     state.status = 'ready';
     state.qrDataUrl = null;
+    state.pairingCode = null;
     state.lastReadyAt = new Date().toISOString();
     state.lastError = null;
     try {
@@ -213,6 +221,29 @@ async function resolveNumber(raw) {
   return id ? id._serialized : null;
 }
 
+// Método alternativo al QR: vincular con número + código de 8 caracteres.
+// En WhatsApp: Dispositivos vinculados → Vincular dispositivo → "Vincular con número".
+async function requestPairingCode(rawNumber) {
+  const digits = String(rawNumber || '').replace(/[^\d]/g, '');
+  if (digits.length < 8) throw new Error('Número inválido (usá formato internacional, ej: 5492617571910)');
+  if (!client) throw Object.assign(new Error('WhatsApp todavía no inició'), { code: 'WA_NOT_READY' });
+  if (state.status === 'ready') throw new Error('Ya hay un WhatsApp conectado. Desvinculá primero.');
+  // Reintenta unos segundos si el cliente aún no llegó al punto de emparejamiento.
+  let lastErr;
+  for (let i = 0; i < 6; i++) {
+    try {
+      const code = await client.requestPairingCode(digits, true);
+      state.pairingCode = code;
+      console.log('[wa] pairing code generado para', digits.slice(-4));
+      return code;
+    } catch (e) {
+      lastErr = e;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+  }
+  throw lastErr || new Error('No se pudo generar el código');
+}
+
 // --- Media en disco (/data/media) ---
 const SAFE_EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif',
   'video/mp4': 'mp4', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'application/pdf': 'pdf' };
@@ -269,6 +300,7 @@ async function relink() {
     state.status = 'starting';
     state.info = null;
     state.qrDataUrl = null;
+    state.pairingCode = null;
     client = buildClient();
     await client.initialize();
   } finally {
@@ -278,7 +310,7 @@ async function relink() {
 
 module.exports = {
   init, getState,
-  sendText, sendMedia, resolveNumber,
+  sendText, sendMedia, resolveNumber, requestPairingCode,
   saveIncomingMedia, saveBase64, mediaPath,
   reconnect, relink,
   MEDIA_DIR, SESSION_DIR,
