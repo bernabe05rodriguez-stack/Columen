@@ -3249,7 +3249,7 @@ const PUBLIC_SYMBOLS = `<svg xmlns="http://www.w3.org/2000/svg" style="display:n
   <symbol id="logo" viewBox="0 0 690 170" fill="none"><circle cx="62" cy="84" r="47" fill="none" stroke="#b8974a" stroke-width="1.1" opacity=".85"/><circle cx="62" cy="84" r="43.5" fill="none" stroke="#ffffff" stroke-width="5"/><circle cx="62" cy="84" r="40" fill="none" stroke="#b8974a" stroke-width="1.1" opacity=".85"/><path d="M 92.3 68.6 A 34 34 0 1 0 92.3 99.4" fill="none" stroke="#6aacd6" stroke-width="5.5" stroke-linecap="round"/><circle cx="92.3" cy="68.6" r="6.4" fill="none" stroke="#b8974a" stroke-width="1.2"/><circle cx="92.3" cy="68.6" r="4.6" fill="#6aacd6"/><circle cx="92.3" cy="99.4" r="6.4" fill="none" stroke="#b8974a" stroke-width="1.2"/><circle cx="92.3" cy="99.4" r="4.6" fill="#6aacd6"/><line x1="124" y1="42" x2="124" y2="128" stroke="#ffffff" stroke-width="1.2" opacity="0.5"/><text x="140" y="98" font-family="'Lora',Georgia,serif" font-size="56" font-weight="700" letter-spacing="5" fill="#ffffff">COLUMEN</text><text x="142" y="126" font-family="'Inter',sans-serif" font-size="14.5" font-weight="600" letter-spacing="5" fill="#b8974a">LEGAL &amp; NOTARIAL</text></symbol>
 </svg>`;
 
-const WA_BLOG_LINK = 'https://wa.me/5492617571910?text=' + encodeURIComponent('Hola, leí un artículo del blog y quiero hacer una consulta');
+const WA_BLOG_LINK = 'https://wa.me/5492617252111?text=' + encodeURIComponent('Hola, leí un artículo del blog y quiero hacer una consulta');
 
 // Layout compartido de las páginas públicas server-rendered (blog)
 function publicPage({ title, description, canonical, content, jsonLd, ogType }) {
