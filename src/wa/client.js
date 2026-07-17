@@ -52,7 +52,7 @@ const state = {
 };
 
 let client = null;
-let callbacks = { onMessage: null, onAck: null };
+let callbacks = { onMessage: null, onAck: null, onReady: null };
 let relinking = false;
 let lastQrString = null;
 let everReady = false;  // ¿alguna vez llegó a estar conectado en esta corrida?
@@ -163,6 +163,9 @@ function buildClient() {
       };
     } catch {}
     console.log('[wa] LISTO — número vinculado:', state.info?.number);
+    if (callbacks.onReady) {
+      Promise.resolve(callbacks.onReady()).catch(e => console.error('[wa] onReady handler error', e.message));
+    }
   });
 
   c.on('disconnected', async (reason) => {
@@ -242,9 +245,10 @@ async function start({ wipe } = {}) {
   }
 }
 
-function init({ onMessage, onAck } = {}) {
+function init({ onMessage, onAck, onReady } = {}) {
   callbacks.onMessage = onMessage || null;
   callbacks.onAck = onAck || null;
+  callbacks.onReady = onReady || null;
   if (client) return client;
   start().catch(() => {}); // el supervisor crea el client, lo inicializa y reintenta solo
   return client;
@@ -279,6 +283,15 @@ async function sendMedia(to, media) {
   const mm = new MessageMedia(media.mimetype, media.data, media.filename || undefined);
   const msg = await client.sendMessage(toChatId(to), mm, { caption: media.caption || undefined });
   return msg;
+}
+
+// Resuelve el número real de un remitente identificado por LID (@lid).
+// Devuelve los dígitos (ej '5492617252111') o null si no se pudo mapear.
+async function lidToPhone(lidJid) {
+  ensureReady();
+  const res = await client.getContactLidAndPhone([String(lidJid)]);
+  const pn = res?.[0]?.pn;
+  return pn ? String(pn).split('@')[0] : null;
 }
 
 // Resuelve un número "crudo" a su JID real en WhatsApp (para chats iniciados por el admin).
@@ -397,7 +410,7 @@ async function relink() {
 
 module.exports = {
   init, getState,
-  sendText, sendMedia, resolveNumber, requestPairingCode,
+  sendText, sendMedia, resolveNumber, lidToPhone, requestPairingCode,
   saveIncomingMedia, saveBase64, mediaPath,
   reconnect, relink, close,
   MEDIA_DIR, SESSION_DIR,

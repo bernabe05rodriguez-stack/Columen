@@ -3174,12 +3174,25 @@ async function handleIncoming(msg) {
     if (!from) return;
 
     // Remitente identificado por LID (@lid): lo que va antes del @ NO es un teléfono.
-    // Si WhatsApp manda el número real (senderPn), usamos ese como clave; si no,
-    // queda el LID como clave. En ambos casos guardamos el JID exacto del chat,
-    // porque responder reconstruyendo <digitos>@c.us falla con "No LID for user".
+    // Clave del inbox = número real, resuelto por (en orden): senderPn del payload,
+    // mapeo ya guardado en chat_ids, o consulta a WhatsApp (getContactLidAndPhone).
+    // Si nada resuelve, queda el LID como clave. En todos los casos guardamos el JID
+    // exacto del chat: responder reconstruyendo <digitos>@c.us falla con "No LID for user".
     if (rawFrom.endsWith('@lid')) {
       const pn = String(msg._data?.senderPn || '').split('@')[0].replace(/[^\d]/g, '');
-      if (pn.length >= 8) from = pn;
+      if (pn.length >= 8) {
+        from = pn;
+      } else {
+        const cached = db.prepare('SELECT telefono FROM chat_ids WHERE chat_id = ?').get(rawFrom)?.telefono;
+        if (cached && cached !== from) {
+          from = cached;
+        } else {
+          try {
+            const real = await wa.lidToPhone(rawFrom);
+            if (real && real.length >= 8) from = real;
+          } catch (e) { console.error('[wa] lidToPhone', e.message); }
+        }
+      }
     }
     try {
       db.prepare('INSERT INTO chat_ids (telefono, chat_id) VALUES (?, ?) ON CONFLICT(telefono) DO UPDATE SET chat_id = excluded.chat_id').run(from, rawFrom);
@@ -3229,6 +3242,36 @@ async function handleIncoming(msg) {
 // Actualiza el tick/estado de un mensaje saliente (evento message_ack).
 function handleAck(waId, status) {
   try { db.prepare('UPDATE messages SET status = ? WHERE wa_id = ?').run(status, waId); } catch {}
+}
+
+// Re-clavea a su número real las filas guardadas con un LID como "teléfono"
+// (remitentes @lid de antes de poder resolver el número). Corre al conectar
+// WhatsApp; si no hay nada para reparar, no hace nada.
+async function repairLidTelefonos() {
+  let rows = [];
+  try { rows = db.prepare("SELECT telefono, chat_id FROM chat_ids WHERE chat_id LIKE '%@lid'").all(); } catch { return; }
+  for (const r of rows) {
+    if (r.telefono !== String(r.chat_id).split('@')[0]) continue; // ya tiene número real
+    try {
+      const real = await wa.lidToPhone(r.chat_id);
+      if (!real || real.length < 8 || real === r.telefono) continue;
+      db.transaction(() => {
+        db.prepare('UPDATE consultas SET telefono = ? WHERE telefono = ?').run(real, r.telefono);
+        db.prepare('UPDATE messages SET telefono = ? WHERE telefono = ?').run(real, r.telefono);
+        db.prepare('UPDATE bot_state SET telefono = ? WHERE telefono = ?').run(real, r.telefono);
+        if (db.prepare('SELECT 1 FROM conversations WHERE telefono = ?').get(real)) {
+          db.prepare('DELETE FROM conversations WHERE telefono = ?').run(r.telefono);
+        } else {
+          db.prepare('UPDATE conversations SET telefono = ? WHERE telefono = ?').run(real, r.telefono);
+        }
+        db.prepare('UPDATE OR IGNORE conversation_labels SET telefono = ? WHERE telefono = ?').run(real, r.telefono);
+        db.prepare('DELETE FROM conversation_labels WHERE telefono = ?').run(r.telefono);
+        db.prepare('INSERT INTO chat_ids (telefono, chat_id) VALUES (?, ?) ON CONFLICT(telefono) DO UPDATE SET chat_id = excluded.chat_id').run(real, r.chat_id);
+        db.prepare('DELETE FROM chat_ids WHERE telefono = ?').run(r.telefono);
+      })();
+      console.log('[wa] LID re-claveado a número real:', maskTel(r.telefono), '->', maskTel(real));
+    } catch (e) { console.error('[wa] repairLidTelefonos', e.message); }
+  }
 }
 
 // --- Páginas legales con URLs limpias (sin .html) ---
@@ -3718,7 +3761,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 // Blindado: cualquier fallo al iniciar WhatsApp NO debe tumbar el server (la landing y
 // el /admin tienen que seguir funcionando aunque WhatsApp no conecte).
 try {
-  wa.init({ onMessage: handleIncoming, onAck: handleAck });
+  wa.init({ onMessage: handleIncoming, onAck: handleAck, onReady: repairLidTelefonos });
 } catch (e) {
   console.error('[wa] init lanzó una excepción (el server sigue igual):', e.message);
 }
