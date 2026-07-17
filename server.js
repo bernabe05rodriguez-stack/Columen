@@ -13,12 +13,13 @@ const config = require('./src/config');
 const {
   NODE_ENV, IS_PROD, PORT,
   ADMIN_USER, ADMIN_PASS, ADMIN_PASS_HASH, SESSION_SECRET,
-  WA_TOKEN, WA_PHONE_ID, WA_VERIFY_TOKEN, APP_SECRET,
-  RECONTACT_TEMPLATE_NAME, RECONTACT_TEMPLATE_LANG, RECONTACT_TEMPLATE_PREVIEW,
   PUBLIC_URL,
   BACKUP_OFFSITE_TOKEN, BACKUP_OFFSITE_REPO, BACKUP_OFFSITE_BRANCH,
 } = config;
 config.logConfigWarnings();
+
+// Capa de transporte WhatsApp (whatsapp-web.js — sesión por QR, número propio).
+const wa = require('./src/wa/client');
 
 const app = express();
 // Detrás del reverse proxy de EasyPanel: confiar en el primer proxy para que
@@ -240,13 +241,7 @@ setInterval(() => {
   } catch (e) { console.error('[cleanup] error', e.message); }
 }, 6 * 60 * 60 * 1000);
 
-app.use(express.json({
-  limit: '1mb',
-  verify: (req, res, buf) => {
-    // Only the Meta webhook needs raw body for HMAC verification
-    if (req.originalUrl === '/webhook') req.rawBody = buf;
-  },
-}));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -263,7 +258,7 @@ app.use(helmet({
       'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
       'img-src': ["'self'", 'data:', 'https:', 'blob:'],
       'media-src': ["'self'", 'blob:', 'https:'],
-      'connect-src': ["'self'", 'https://graph.facebook.com'],
+      'connect-src': ["'self'"],
       'frame-src': ['https://www.google.com', 'https://maps.google.com'],
       'frame-ancestors': ["'none'"],
       'base-uri': ["'self'"],
@@ -293,34 +288,6 @@ function isAuthenticated(req) {
   if (!token) return false;
   const row = db.prepare("SELECT token FROM sessions WHERE token = ? AND created_at > datetime('now', '-1 day')").get(token);
   return !!row;
-}
-
-// --- Meta webhook signature verification (X-Hub-Signature-256) ---
-function verifyMetaSignature(req, res, next) {
-  if (!APP_SECRET) {
-    console.error('[WA] webhook rejected: APP_SECRET not configured');
-    return res.status(500).send('server misconfigured');
-  }
-  const sig = req.headers['x-hub-signature-256'];
-  if (!sig || !sig.startsWith('sha256=')) {
-    return res.status(401).send('missing signature');
-  }
-  const provided = sig.slice(7);
-  const raw = req.rawBody || Buffer.from('');
-  const expected = crypto.createHmac('sha256', APP_SECRET).update(raw).digest('hex');
-  let ok = false;
-  try {
-    const a = Buffer.from(expected, 'hex');
-    const b = Buffer.from(provided, 'hex');
-    ok = a.length === b.length && crypto.timingSafeEqual(a, b);
-  } catch {
-    ok = false;
-  }
-  if (!ok) {
-    console.warn('[WA] webhook rejected: invalid signature');
-    return res.status(401).send('invalid signature');
-  }
-  next();
 }
 
 // --- CSRF protection (double-submit cookie) ---
@@ -774,6 +741,7 @@ app.get('/admin', (req, res) => {
     <a href="/admin/inbox">WhatsApp</a>
     <a href="/admin/backup">Backup</a>
     <a href="/admin/blog">Blog</a>
+    <a href="/admin/conexion">Conexión</a>
     <span class="sep"></span>
     <a href="/admin/logout" class="logout">Salir</a>
   </nav>
@@ -1051,6 +1019,7 @@ app.get('/admin/backup', (req, res) => {
     <a href="/admin/inbox">WhatsApp</a>
     <a href="/admin/backup" class="active">Backup</a>
     <a href="/admin/blog">Blog</a>
+    <a href="/admin/conexion">Conexión</a>
     <span class="sep"></span>
     <a href="/admin/logout" class="logout">Salir</a>
   </nav>
@@ -1300,6 +1269,7 @@ function adminBlogShell(title, inner, csrfToken) {
     <a href="/admin/inbox">WhatsApp</a>
     <a href="/admin/backup">Backup</a>
     <a href="/admin/blog" class="active">Blog</a>
+    <a href="/admin/conexion">Conexión</a>
     <span class="sep"></span>
     <a href="/admin/logout" class="logout">Salir</a>
   </nav>
@@ -1458,19 +1428,11 @@ app.get('/admin/inbox/:tel/messages', (req, res) => {
   if (!conv) conv = { telefono: tel, bot_paused: 0, unread: 0 };
   const nombre = resolveName(tel);
   const labels = labelsForTel(tel);
-  const lastIn = db.prepare("SELECT created_at FROM messages WHERE telefono = ? AND direction = 'in' ORDER BY id DESC LIMIT 1").get(tel);
-  let canSend = true;
-  if (lastIn?.created_at) {
-    const hoursAgo = (Date.now() - new Date(lastIn.created_at.replace(' ', 'T')).getTime()) / 3600000;
-    canSend = hoursAgo < 24;
-  } else {
-    canSend = false;
-  }
+  // Con número propio (whatsapp-web.js) no hay ventana de 24hs: se puede escribir siempre.
   res.json({
     messages,
     conversation: { ...conv, nombre, labels },
-    canSend,
-    recontactTemplate: { name: RECONTACT_TEMPLATE_NAME, lang: RECONTACT_TEMPLATE_LANG, preview: RECONTACT_TEMPLATE_PREVIEW },
+    canSend: true,
   });
 });
 
@@ -1490,83 +1452,38 @@ app.get('/admin/inbox/:tel/search', (req, res) => {
   res.json({ matches, query: q });
 });
 
-// Send image (base64 JSON body)
+// Envío de media (imagen/video/audio/documento) — base64 en el body JSON.
+const ALLOWED_SEND_MIME = /^(image\/(jpeg|png|webp|gif)|video\/mp4|audio\/(ogg|mpeg|mp4|aac)|application\/pdf)$/;
 app.post('/admin/inbox/:tel/send-image', requireCsrf, express.json({ limit: '16mb' }), async (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
   const tel = req.params.tel;
   const { filename, mime, data, caption } = req.body || {};
   if (!data || !mime) return res.status(400).json({ error: 'missing file' });
-  if (!WA_TOKEN || !WA_PHONE_ID) return res.status(500).json({ error: 'wa not configured' });
+  if (!ALLOWED_SEND_MIME.test(mime)) return res.status(400).json({ error: 'tipo de archivo no permitido' });
+  // Límite de tamaño real del contenido decodificado (~14MB tras base64).
+  if (typeof data !== 'string' || data.length > 20 * 1024 * 1024) return res.status(400).json({ error: 'archivo demasiado grande' });
+  if ((caption || '').length > 4000) return res.status(400).json({ error: 'caption demasiado largo' });
   try {
-    const buf = Buffer.from(data, 'base64');
-    const form = new FormData();
-    form.append('messaging_product', 'whatsapp');
-    form.append('type', mime);
-    form.append('file', new Blob([buf], { type: mime }), filename || 'upload.bin');
-    const up = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/media`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${WA_TOKEN}` },
-      body: form,
-    });
-    const upJson = await up.json();
-    if (!up.ok || !upJson.id) {
-      console.error('[WA] media upload error', JSON.stringify(upJson));
-      return res.status(400).json({ error: 'upload failed', detail: upJson.error?.message || 'unknown' });
-    }
-    const mediaId = upJson.id;
-    const isImage = mime.startsWith('image/');
-    const isVideo = mime.startsWith('video/');
-    const isAudio = mime.startsWith('audio/');
-    const type = isImage ? 'image' : isVideo ? 'video' : isAudio ? 'audio' : 'document';
-    const payload = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: tel,
-      type,
-      [type]: type === 'document' ? { id: mediaId, filename: filename || 'archivo', caption: caption || undefined } : { id: mediaId, caption: caption || undefined },
-    };
     const exists = db.prepare('SELECT telefono FROM conversations WHERE telefono = ?').get(tel);
     if (exists) db.prepare('UPDATE conversations SET bot_paused = 1 WHERE telefono = ?').run(tel);
     else db.prepare("INSERT INTO conversations (telefono, last_at, bot_paused) VALUES (?, datetime('now','localtime'), 1)").run(tel);
-    const result = await waSend(payload);
+    const result = await sendMedia(tel, { data, mimetype: mime, filename, caption });
     if (result?.error) return res.status(400).json({ error: result.error.message || 'send failed' });
-    // Update last stored message to include mime (waSend records with null mime)
-    db.prepare("UPDATE messages SET media_mime = ? WHERE telefono = ? AND direction = 'out' AND media_id = ?").run(mime, tel, mediaId);
     res.json({ ok: true });
   } catch (e) {
-    console.error('[WA] send-image error', e);
+    console.error('[wa] send-image error', e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// Media proxy: fetch from Meta CDN with auth
-const mediaUrlCache = new Map();
-app.get('/admin/media/:id', async (req, res) => {
+// Media: sirve el archivo guardado en /data/media (ya no hay CDN de Meta).
+// El :id es el nombre de archivo (fileId) validado contra path traversal en wa.mediaPath.
+app.get('/admin/media/:id', (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).send('unauth');
-  const id = req.params.id;
-  if (!/^\d+$/.test(id)) return res.status(400).send('invalid id');
-  try {
-    let meta = mediaUrlCache.get(id);
-    const now = Date.now();
-    if (!meta || (now - meta.ts) > 4 * 60 * 1000) {
-      const r = await fetch(`https://graph.facebook.com/v21.0/${id}`, {
-        headers: { Authorization: `Bearer ${WA_TOKEN}` },
-      });
-      const j = await r.json();
-      if (!r.ok || !j.url) return res.status(400).send('meta meta error');
-      meta = { url: j.url, mime: j.mime_type, ts: now };
-      mediaUrlCache.set(id, meta);
-    }
-    const r2 = await fetch(meta.url, { headers: { Authorization: `Bearer ${WA_TOKEN}` } });
-    if (!r2.ok) return res.status(400).send('meta cdn error');
-    res.setHeader('Content-Type', meta.mime || r2.headers.get('content-type') || 'application/octet-stream');
-    res.setHeader('Cache-Control', 'private, max-age=3600');
-    const buf = Buffer.from(await r2.arrayBuffer());
-    res.end(buf);
-  } catch (e) {
-    console.error('[media proxy]', e);
-    res.status(500).send('error');
-  }
+  const p = wa.mediaPath(req.params.id);
+  if (!p) return res.status(404).send('not found');
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.sendFile(p);
 });
 
 app.post('/admin/inbox/:tel/read', requireCsrf, (req, res) => {
@@ -1590,53 +1507,26 @@ app.post('/admin/inbox/:tel/bot', requireCsrf, (req, res) => {
 
 app.post('/admin/inbox/:tel/send', requireCsrf, async (req, res) => {
   if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
-  const tel = req.params.tel;
+  let tel = req.params.tel;
   const body = (req.body?.body || '').trim();
   if (!body) return res.status(400).json({ error: 'empty' });
-  const exists = db.prepare('SELECT telefono FROM conversations WHERE telefono = ?').get(tel);
-  if (exists) {
-    db.prepare('UPDATE conversations SET bot_paused = 1 WHERE telefono = ?').run(tel);
-  } else {
-    db.prepare("INSERT INTO conversations (telefono, last_at, bot_paused) VALUES (?, datetime('now','localtime'), 1)").run(tel);
-  }
-  const result = await sendText(tel, body);
-  if (result?.error) return res.status(400).json({ error: 'wa_error', detail: result.error.message || 'Error de WhatsApp', raw: result.error });
-  res.json({ ok: true });
-});
-
-// Envía la plantilla de re-contacto para reabrir la ventana 24hs cuando expiró.
-// Auto-pausa el bot. Body opcional: {} (usa defaults de env vars).
-app.post('/admin/inbox/:tel/send-template', requireCsrf, async (req, res) => {
-  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
-  const tel = req.params.tel;
-  const exists = db.prepare('SELECT telefono FROM conversations WHERE telefono = ?').get(tel);
-  if (exists) {
-    db.prepare('UPDATE conversations SET bot_paused = 1 WHERE telefono = ?').run(tel);
-  } else {
-    db.prepare("INSERT INTO conversations (telefono, last_at, bot_paused) VALUES (?, datetime('now','localtime'), 1)").run(tel);
-  }
-  const result = await sendTemplate(tel);
-  if (result?.error) {
-    const detail = result.error.message || 'Error de WhatsApp';
-    const lower = detail.toLowerCase();
-    let hint = 'Verificá la plantilla en business.facebook.com.';
-    if (lower.includes('does not exist') || lower.includes('not found')) {
-      hint = 'La plantilla "' + RECONTACT_TEMPLATE_NAME + '" no existe en este WABA. Revisá el nombre en Meta Business.';
-    } else if (lower.includes('not approved') || lower.includes('pending') || lower.includes('rejected')) {
-      hint = 'La plantilla "' + RECONTACT_TEMPLATE_NAME + '" no está APROBADA todavía. Esperá a que Meta la apruebe (PENDING -> APPROVED).';
-    } else if (lower.includes('rate') || lower.includes('limit')) {
-      hint = 'Límite de mensajes alcanzado. Esperá unos minutos.';
-    } else if (lower.includes('#100') || lower.includes('invalid parameter')) {
-      hint = 'Parámetro inválido. Probable causa: nombre de plantilla incorrecto, idioma incorrecto, o plantilla todavía PENDING en Meta.';
+  if (body.length > 8000) return res.status(400).json({ error: 'mensaje demasiado largo' });
+  // Chat nuevo (número tipeado a mano): intento resolver el JID real en WhatsApp.
+  const existing = db.prepare('SELECT telefono FROM conversations WHERE telefono = ?').get(tel);
+  if (!existing) {
+    try {
+      const jid = await wa.resolveNumber(tel);
+      if (jid) tel = jid.split('@')[0];
+    } catch (e) {
+      return res.status(400).json({ error: 'wa_error', detail: e.code === 'WA_NOT_READY' ? 'WhatsApp no está conectado. Escaneá el QR en Conexión.' : e.message });
     }
-    return res.status(400).json({
-      error: 'wa_error',
-      detail,
-      hint,
-      raw: result.error,
-    });
   }
-  res.json({ ok: true, name: RECONTACT_TEMPLATE_NAME, lang: RECONTACT_TEMPLATE_LANG, preview: RECONTACT_TEMPLATE_PREVIEW });
+  const exists2 = db.prepare('SELECT telefono FROM conversations WHERE telefono = ?').get(tel);
+  if (exists2) db.prepare('UPDATE conversations SET bot_paused = 1 WHERE telefono = ?').run(tel);
+  else db.prepare("INSERT INTO conversations (telefono, last_at, bot_paused) VALUES (?, datetime('now','localtime'), 1)").run(tel);
+  const result = await sendText(tel, body);
+  if (result?.error) return res.status(400).json({ error: 'wa_error', detail: result.error.message || 'Error de WhatsApp' });
+  res.json({ ok: true, tel });
 });
 
 app.get('/admin/inbox', (req, res) => {
@@ -1948,6 +1838,7 @@ app.get('/admin/inbox', (req, res) => {
     <a href="/admin/inbox" class="active">WhatsApp</a>
     <a href="/admin/backup">Backup</a>
     <a href="/admin/blog">Blog</a>
+    <a href="/admin/conexion">Conexión</a>
     <span class="sep"></span>
     <a href="/admin/logout" class="logout">Salir</a>
   </div>
@@ -3105,103 +2996,52 @@ function recordMessage(tel, direction, type, body, waId, mediaId, mediaMime) {
   }
 }
 
-function outboundBodyFor(payload) {
-  if (payload.type === 'text') return payload.text?.body || '';
-  if (payload.type === 'image') return payload.image?.caption || '📷 Foto';
-  if (payload.type === 'document') return payload.document?.caption || payload.document?.filename || '📄 Documento';
-  if (payload.type === 'video') return payload.video?.caption || '🎥 Video';
-  if (payload.type === 'audio') return '🎤 Audio';
-  if (payload.type === 'interactive') {
-    const main = payload.interactive?.body?.text || '';
-    const btns = (payload.interactive?.action?.buttons || []).map(b => `[${b.reply?.title}]`).join(' ');
-    return btns ? `${main}\n${btns}` : main;
-  }
-  if (payload.type === 'template') {
-    return RECONTACT_TEMPLATE_PREVIEW;
-  }
-  return `[${payload.type}]`;
-}
+// --- Envío vía whatsapp-web.js ---
+// Todas las funciones devuelven { ok:true } o { error:{ message } } para mantener
+// la interfaz que ya usaban los endpoints del inbox.
 
-function outboundMediaFor(payload) {
-  const mediaTypes = ['image','audio','video','document','sticker'];
-  if (mediaTypes.includes(payload.type)) {
-    const m = payload[payload.type] || {};
-    return { mediaId: m.id || null, mediaMime: null };
-  }
-  return { mediaId: null, mediaMime: null };
-}
-
-async function waSend(payload) {
-  if (!WA_TOKEN || !WA_PHONE_ID) {
-    console.error('[WA] Missing WHATSAPP_TOKEN or WHATSAPP_PHONE_ID env vars');
-    return { error: { message: 'WhatsApp no configurado' } };
-  }
+// Envía texto y lo loguea en la DB como mensaje saliente.
+async function sendText(to, body) {
   try {
-    const res = await fetch(`https://graph.facebook.com/v21.0/${WA_PHONE_ID}/messages`, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${WA_TOKEN}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      console.error('[WA] send error', JSON.stringify(data));
-      logDebug({ kind: 'send_error', status: res.status, data });
-    } else {
-      logDebug({ kind: 'send_ok', to: payload.to, type: payload.type });
-      const waId = data?.messages?.[0]?.id;
-      const media = outboundMediaFor(payload);
-      recordMessage(payload.to, 'out', payload.type, outboundBodyFor(payload), waId, media.mediaId, media.mediaMime);
-    }
-    return data;
+    const msg = await wa.sendText(to, body);
+    logDebug({ kind: 'send_ok', to: maskTel(to), type: 'text' });
+    recordMessage(to, 'out', 'text', body, msg?.id?._serialized || null);
+    return { ok: true, id: msg?.id?._serialized || null };
   } catch (err) {
-    console.error('[WA] fetch failed', err.message);
-    logDebug({ kind: 'send_fetch_failed', error: err.message });
-    return { error: { message: err.message } };
+    console.error('[wa] sendText error', err.message);
+    logDebug({ kind: 'send_error', error: err.message });
+    return { error: { message: err.code === 'WA_NOT_READY' ? 'WhatsApp no está conectado. Escaneá el QR en Conexión.' : err.message } };
   }
 }
 
-function sendWelcomeButtons(to) {
-  return waSend({
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to,
-    type: 'interactive',
-    interactive: {
-      type: 'button',
-      body: { text: 'Hola! Bienvenido a *COLUMEN* - Estudio Legal & Notarial.\n\nPara orientarte mejor, seleccioná el área de tu consulta:\n\n_Al continuar aceptás nuestra política de privacidad: columen.ar/legales/privacidad_' },
-      action: {
-        buttons: [
-          { type: 'reply', reply: { id: 'area_juridico', title: 'Jurídico' } },
-          { type: 'reply', reply: { id: 'area_notarial', title: 'Notarial' } },
-        ],
-      },
-    },
-  });
+// Envía media (base64) y la guarda en /data/media para poder renderizarla en el inbox.
+async function sendMedia(to, { data, mimetype, filename, caption }) {
+  try {
+    const msg = await wa.sendMedia(to, { data, mimetype, filename, caption });
+    let fileId = null;
+    try { fileId = wa.saveBase64(data, mimetype, filename); } catch (e) { console.error('[wa] saveBase64 out', e.message); }
+    const isImage = mimetype.startsWith('image/');
+    const isVideo = mimetype.startsWith('video/');
+    const isAudio = mimetype.startsWith('audio/');
+    const type = isImage ? 'image' : isVideo ? 'video' : isAudio ? 'audio' : 'document';
+    const label = isImage ? '📷 Foto' : isVideo ? '🎥 Video' : isAudio ? '🎤 Audio' : `📄 ${filename || 'Documento'}`;
+    const body = caption ? `${label}\n${caption}` : label;
+    recordMessage(to, 'out', type, body, msg?.id?._serialized || null, fileId, mimetype);
+    return { ok: true };
+  } catch (err) {
+    console.error('[wa] sendMedia error', err.message);
+    return { error: { message: err.code === 'WA_NOT_READY' ? 'WhatsApp no está conectado. Escaneá el QR en Conexión.' : err.message } };
+  }
 }
 
-function sendText(to, body) {
-  return waSend({
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to,
-    type: 'text',
-    text: { body },
-  });
-}
-
-// Envía la plantilla aprobada de re-contacto (UTILITY, sin variables).
-// Reabre la ventana de 24hs cuando el cliente responde.
-function sendTemplate(to, name = RECONTACT_TEMPLATE_NAME, language = RECONTACT_TEMPLATE_LANG) {
-  return waSend({
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to,
-    type: 'template',
-    template: {
-      name,
-      language: { code: language },
-    },
-  });
+// Mensaje de bienvenida (menú de texto — WhatsApp común no soporta botones interactivos).
+function sendWelcome(to) {
+  return sendText(to,
+    'Hola! Bienvenido a *COLUMEN* — Estudio Legal & Notarial.\n\n' +
+    'Para orientarte mejor, respondé con el número del área de tu consulta:\n\n' +
+    '*1*  Jurídico\n' +
+    '*2*  Notarial\n\n' +
+    '_Al continuar aceptás nuestra política de privacidad: columen.ar/legales/privacidad_');
 }
 
 // --- State machine del bot ---
@@ -3220,23 +3060,30 @@ const setState = (tel, fields) => {
 };
 const clearState = (tel) => db.prepare('DELETE FROM bot_state WHERE telefono = ?').run(tel);
 
-async function handleButtonReply(from, buttonId) {
-  let area = null;
-  if (buttonId === 'area_juridico') area = 'juridico';
-  if (buttonId === 'area_notarial') area = 'notarial';
-  if (!area) return;
-  setState(from, { step: 'nombre', area });
-  const label = area === 'juridico' ? 'Jurídico' : 'Notarial';
-  await sendText(from, `Perfecto! Consulta *${label}* seleccionada.\n\nVamos a tomar tus datos. Por favor, escribí tu *nombre completo*:`);
+// Arranca el cuestionario: setea el paso inicial (elegir área) y manda el menú.
+async function startFlow(from) {
+  setState(from, { step: 'area' });
+  return sendWelcome(from);
 }
 
 async function handleTextInFlow(from, text) {
   const state = getState(from);
   if (!state || !state.step) {
-    return sendWelcomeButtons(from);
+    return startFlow(from);
   }
   const clean = (text || '').trim();
   if (!clean) return;
+
+  if (state.step === 'area') {
+    const t = clean.toLowerCase();
+    let area = null;
+    if (/^\s*1\b/.test(t) || t.includes('jur')) area = 'juridico';
+    else if (/^\s*2\b/.test(t) || t.includes('not')) area = 'notarial';
+    if (!area) return sendText(from, 'No te entendí. Respondé con *1* para Jurídico o *2* para Notarial:');
+    const label = area === 'juridico' ? 'Jurídico' : 'Notarial';
+    setState(from, { step: 'nombre', area });
+    return sendText(from, `Perfecto! Consulta *${label}* seleccionada.\n\nVamos a tomar tus datos. Por favor, escribí tu *nombre completo*:`);
+  }
 
   if (state.step === 'nombre') {
     if (clean.length < 2) return sendText(from, 'El nombre parece muy corto. Por favor escribí tu nombre completo:');
@@ -3280,81 +3127,60 @@ app.get('/bot-debug', (req, res) => {
   res.json({ events: debugLog.slice().reverse(), states });
 });
 
-// Webhook verification (GET) - Meta llama esto una vez para confirmar la URL
-app.get('/webhook', (req, res) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-  if (mode === 'subscribe' && token === WA_VERIFY_TOKEN) {
-    console.log('[WA] webhook verified');
-    return res.status(200).send(challenge);
-  }
-  res.sendStatus(403);
-});
-
-// Webhook receiver (POST) - mensajes entrantes de WhatsApp
-// HMAC signature verification (X-Hub-Signature-256) is enforced before parsing
-app.post('/webhook', verifyMetaSignature, async (req, res) => {
-  res.sendStatus(200);
+// --- Handler de mensajes entrantes (whatsapp-web.js) ---
+// Reemplaza al webhook de Meta. Se engancha vía wa.init({ onMessage: handleIncoming }).
+async function handleIncoming(msg) {
   try {
-    const entry = req.body.entry?.[0];
-    const change = entry?.changes?.[0];
-    const value = change?.value;
-    const msg = value?.messages?.[0];
-    const statuses = value?.statuses || [];
-    if (statuses.length) {
-      const upd = db.prepare('UPDATE messages SET status = ? WHERE wa_id = ?');
-      for (const s of statuses) {
-        if (['sent','delivered','read','failed'].includes(s.status) && s.id) {
-          upd.run(s.status, s.id);
-        }
-      }
-    }
-    logDebug({ kind: 'webhook_in', hasMsg: !!msg, msgType: msg?.type, from: msg?.from });
-    if (!msg) return;
+    if (!msg || msg.from === 'status@broadcast' || msg.isStatus) return;
+    if (typeof msg.from === 'string' && msg.from.endsWith('@g.us')) return; // ignora grupos
+    const from = String(msg.from || '').split('@')[0];
+    if (!from) return;
 
-    if (isProcessed(msg.id)) { logDebug({ kind: 'dedup_skip', id: msg.id }); return; }
-    markProcessed(msg.id);
+    // Dedup atómico: INSERT OR IGNORE; si changes===0 el mensaje ya se procesó.
+    const wid = msg.id?._serialized || null;
+    if (wid && _markProcessed.run(wid).changes === 0) { logDebug({ kind: 'dedup_skip', id: wid }); return; }
 
-    const from = msg.from;
-    console.log('[WA] msg from', maskTel(from), 'type', msg.type);
+    console.log('[wa] msg de', maskTel(from), 'tipo', msg.type);
 
-    if (msg.type === 'interactive' && msg.interactive?.type === 'button_reply') {
-      const br = msg.interactive.button_reply;
-      recordMessage(from, 'in', 'button_reply', `[botón] ${br.title}`, msg.id);
-      const conv = db.prepare('SELECT bot_paused FROM conversations WHERE telefono = ?').get(from);
-      if (conv?.bot_paused) return;
-      return handleButtonReply(from, br.id);
-    }
+    const isPaused = () => !!db.prepare('SELECT bot_paused FROM conversations WHERE telefono = ?').get(from)?.bot_paused;
 
-    if (msg.type === 'text') {
-      const body = msg.text?.body || '';
-      recordMessage(from, 'in', 'text', body, msg.id);
-      const conv = db.prepare('SELECT bot_paused FROM conversations WHERE telefono = ?').get(from);
-      if (conv?.bot_paused) return;
-      const state = getState(from);
-      if (state && state.step) {
-        return handleTextInFlow(from, body);
-      }
-      return sendWelcomeButtons(from);
-    }
-
-    if (['image','audio','video','document','sticker'].includes(msg.type)) {
-      const media = msg[msg.type] || {};
-      const caption = media.caption || '';
-      const label = msg.type==='image' ? '📷 Foto' : msg.type==='audio' ? '🎤 Audio' : msg.type==='video' ? '🎥 Video' : msg.type==='document' ? `📄 ${media.filename || 'Documento'}` : '⭐ Sticker';
+    // Media entrante (imagen/audio/video/documento/sticker)
+    if (msg.hasMedia) {
+      const saved = await wa.saveIncomingMedia(msg);
+      const kind = msg.type === 'ptt' ? 'audio' : (msg.type || 'document');
+      const label = kind === 'image' ? '📷 Foto' : kind === 'audio' ? '🎤 Audio' : kind === 'video' ? '🎥 Video'
+        : kind === 'sticker' ? '⭐ Sticker' : `📄 ${msg._data?.filename || 'Documento'}`;
+      const caption = (msg.body || '').trim();
       const body = caption ? `${label}\n${caption}` : label;
-      recordMessage(from, 'in', msg.type, body, msg.id, media.id, media.mime_type);
-      const conv = db.prepare('SELECT bot_paused FROM conversations WHERE telefono = ?').get(from);
-      if (conv?.bot_paused) return;
+      recordMessage(from, 'in', kind, body, wid, saved?.fileId || null, saved?.mimetype || null);
+      if (isPaused()) return;
       return sendText(from, 'Gracias por tu mensaje. Para atenderte mejor, escribinos en texto así podemos tomar tus datos y un profesional te contacta a la brevedad.');
     }
 
-    recordMessage(from, 'in', msg.type, `[${msg.type}]`, msg.id);
+    // Tipos no-texto sin media (ubicación, contacto, etc.)
+    if (msg.type !== 'chat') {
+      recordMessage(from, 'in', msg.type || 'other', `[${msg.type || 'mensaje'}]`, wid);
+      if (isPaused()) return;
+      return sendText(from, 'Gracias por tu mensaje. Para atenderte mejor, escribinos en texto así podemos tomar tus datos y un profesional te contacta a la brevedad.');
+    }
+
+    // Texto
+    const body = msg.body || '';
+    recordMessage(from, 'in', 'text', body, wid);
+    logDebug({ kind: 'msg_in', from: maskTel(from) });
+    if (isPaused()) return;
+    const state = getState(from);
+    if (state && state.step) return handleTextInFlow(from, body);
+    return startFlow(from);
   } catch (err) {
-    console.error('[WA] webhook handler error', err);
+    console.error('[wa] handleIncoming error', err.message);
   }
-});
+}
+
+// Actualiza el tick/estado de un mensaje saliente (evento message_ack).
+function handleAck(waId, status) {
+  try { db.prepare('UPDATE messages SET status = ? WHERE wa_id = ?').run(status, waId); } catch {}
+}
 
 // --- Páginas legales con URLs limpias (sin .html) ---
 app.get('/legales/privacidad', (req, res) => {
@@ -3652,11 +3478,181 @@ ${urls.map(u => `  <url><loc>${u.loc}</loc><lastmod>${u.lastmod}</lastmod><prior
   res.type('application/xml').send(xml);
 });
 
+// --- Admin: Conexión de WhatsApp (escaneo QR + estado) ---
+app.get('/admin/conexion/status', (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  res.json(wa.getState());
+});
+app.post('/admin/conexion/reconnect', requireCsrf, (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  wa.reconnect().catch(e => console.error('[wa] reconnect', e.message));
+  res.json({ ok: true });
+});
+app.post('/admin/conexion/relink', requireCsrf, (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  wa.relink().catch(e => console.error('[wa] relink', e.message));
+  res.json({ ok: true });
+});
+// Método alternativo al QR: pedir un código de 8 chars para vincular con número.
+app.post('/admin/conexion/pair', requireCsrf, express.json(), async (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  const number = (req.body && req.body.number) || '';
+  try {
+    const code = await wa.requestPairingCode(number);
+    res.json({ ok: true, code });
+  } catch (e) {
+    res.status(400).json({ error: e.message || 'No se pudo generar el código' });
+  }
+});
+
+app.get('/admin/conexion', (req, res) => {
+  if (!isAuthenticated(req)) return res.redirect('/admin/login');
+  ensureCsrfToken(req, res);
+  res.send(`<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Conexión WhatsApp — COLUMEN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--navy:#1a2744;--gold:#8a6d2b;--gold2:#b8974a;--cream:#fffdf9;--paper:#f6f3ec;--line:#e4ddcb;--ok:#128C3E;--warn:#b8860b;--bad:#b03636}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',system-ui,sans-serif;background:var(--paper);color:var(--navy);min-height:100vh}
+  .topbar{background:var(--navy);color:var(--cream);padding:14px 28px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:30;flex-wrap:wrap;gap:10px}
+  .brand{font-family:'Lora',serif;font-weight:700;font-size:20px;color:var(--cream);text-decoration:none;letter-spacing:.5px}
+  .brand small{font-family:'Inter';font-weight:500;font-size:12px;color:var(--gold2);letter-spacing:1px}
+  .nav{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+  .nav a{color:#cdd4e2;text-decoration:none;padding:7px 12px;border-radius:7px;font-size:13.5px;font-weight:500}
+  .nav a:hover{background:rgba(255,255,255,.08);color:#fff}
+  .nav a.active{background:var(--gold);color:#fff}
+  .nav a.logout{color:#e6b8b8}
+  main{max-width:500px;margin:0 auto;padding:44px 18px 60px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:36px 30px;box-shadow:0 12px 34px -18px rgba(26,39,68,.4);text-align:center}
+  h1{font-family:'Lora',serif;font-size:23px;margin-bottom:18px}
+  .status{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:14.5px;padding:7px 16px;border-radius:999px;background:var(--paper);border:1px solid var(--line);margin-bottom:26px}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .dot.ok{background:var(--ok)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+  .qr{width:256px;height:256px;border:1px solid var(--line);border-radius:16px;background:#fff;padding:10px;margin:0 auto;display:none}
+  .spin{color:#8a8272;font-size:14px;padding:108px 0}
+  .steps{list-style:none;max-width:320px;margin:24px auto 0;text-align:left;display:grid;gap:13px}
+  .steps li{display:flex;align-items:center;gap:12px;font-size:14.5px;line-height:1.35}
+  .steps .n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--navy);color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .alt{margin-top:24px}
+  .alt a{color:var(--gold);font-size:13px;font-weight:500;cursor:pointer;text-decoration:none}
+  .alt a:hover{text-decoration:underline}
+  .pair{display:none;margin-top:16px}
+  .pair.open{display:block}
+  #pairNum{width:100%;max-width:320px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit;outline:none;margin-bottom:10px;text-align:center}
+  #pairNum:focus{border-color:var(--gold2)}
+  .code{font-family:'Lora',serif;font-size:30px;letter-spacing:5px;font-weight:700;color:var(--navy);background:var(--paper);border:1px dashed var(--gold2);border-radius:12px;padding:14px;margin:12px auto 0;max-width:300px}
+  .err{color:var(--bad);font-size:13px}
+  .check{font-size:52px;line-height:1}
+  .cnum{font-family:'Lora',serif;font-size:24px;margin-top:12px}
+  .csub{color:#6b6455;font-size:14px;margin-top:6px}
+  .btn{border:0;border-radius:10px;padding:12px 22px;font-size:14.5px;font-weight:600;cursor:pointer;font-family:inherit}
+  .btn.primary{background:var(--navy);color:#fff}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--navy)}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .unlink{display:inline-block;margin-top:26px;color:#b06a6a;font-size:13px;cursor:pointer;text-decoration:none}
+  .unlink:hover{text-decoration:underline;color:var(--bad)}
+</style></head>
+<body>
+<div class="topbar">
+  <a href="/admin" class="brand">COLUMEN <small>· Conexión</small></a>
+  <nav class="nav">
+    <a href="/admin">Consultas</a>
+    <a href="/admin/inbox">WhatsApp</a>
+    <a href="/admin/backup">Backup</a>
+    <a href="/admin/blog">Blog</a>
+    <a href="/admin/conexion" class="active">Conexión</a>
+    <a href="/admin/logout" class="logout">Salir</a>
+  </nav>
+</div>
+<main>
+  <div class="card">
+    <h1>WhatsApp del estudio</h1>
+    <div class="status"><span class="dot warn" id="dot"></span><span id="stLabel">Cargando…</span></div>
+
+    <div id="qrPanel" style="display:none">
+      <img class="qr" id="qrImg" src="" alt="Código QR">
+      <div class="spin" id="qrSpin">Generando código…</div>
+      <ol class="steps">
+        <li><span class="n">1</span>Abrí WhatsApp › <b>Dispositivos vinculados</b></li>
+        <li><span class="n">2</span>Tocá <b>Vincular un dispositivo</b></li>
+        <li><span class="n">3</span>Escaneá el código de arriba</li>
+      </ol>
+      <div class="alt"><a id="altToggle">¿No podés escanear? Vinculá con tu número →</a></div>
+      <div class="pair" id="pairBox">
+        <input id="pairNum" type="text" inputmode="numeric" placeholder="Ej: 5492617571910">
+        <button class="btn ghost" id="btnPair">Obtener código</button>
+        <div id="pairResult"></div>
+      </div>
+    </div>
+
+    <div id="connPanel" style="display:none">
+      <div class="check">✅</div>
+      <div class="cnum" id="connNum"></div>
+      <div class="csub">Conectado y activo</div>
+      <a class="unlink" id="btnRelink">Desvincular</a>
+    </div>
+
+    <div id="waitPanel" style="display:none">
+      <div class="spin" id="waitTxt">Conectando…</div>
+      <button class="btn primary" id="btnReconnect">Reintentar</button>
+    </div>
+  </div>
+</main>
+<script>
+  function $(id){ return document.getElementById(id); }
+  function csrf(){ return (document.cookie.match(/(?:^|; )csrf=([^;]+)/)||[])[1]||''; }
+  function postJSON(url, body){ return fetch(url,{method:'POST',headers:{'X-CSRF-Token':csrf(),'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}); }
+  var DOT={ready:'ok',qr:'warn',authenticating:'warn',starting:'warn',disconnected:'bad',auth_failure:'bad'};
+  var LABEL={ready:'Conectado',qr:'Escaneá para vincular',authenticating:'Conectando…',starting:'Iniciando…',disconnected:'Sin conexión',auth_failure:'Error'};
+  var mode='', qrV=-1;
+  var qrImg=$('qrImg'), qrSpin=$('qrSpin');
+
+  $('altToggle').onclick=function(){ $('pairBox').classList.toggle('open'); };
+  $('btnPair').onclick=async function(){
+    var n=$('pairNum').value.replace(/[^\\d]/g,''); var out=$('pairResult'); var b=this;
+    if(n.length<8){ out.innerHTML='<span class="err">Ingresá el número con código de país.</span>'; return; }
+    b.disabled=true; b.textContent='…';
+    try{ var j=await (await postJSON('/admin/conexion/pair',{number:n})).json();
+      out.innerHTML = (j.ok&&j.code) ? '<div class="code">'+j.code+'</div>' : '<span class="err">'+(j.error||'No se pudo')+'</span>';
+    }catch(e){ out.innerHTML='<span class="err">Error de red</span>'; }
+    b.disabled=false; b.textContent='Obtener código';
+  };
+  $('btnRelink').onclick=async function(){ if(!confirm('¿Desvincular este WhatsApp? Vas a tener que vincular de nuevo.'))return; this.textContent='Desvinculando…'; await postJSON('/admin/conexion/relink'); mode=''; };
+  $('btnReconnect').onclick=async function(){ var b=this; b.disabled=true; b.textContent='…'; await postJSON('/admin/conexion/reconnect'); mode=''; setTimeout(function(){ b.disabled=false; b.textContent='Reintentar'; },2500); };
+
+  async function tick(){
+    var s; try{ s=await (await fetch('/admin/conexion/status')).json(); }catch(e){ return; }
+    $('dot').className='dot '+(DOT[s.status]||'warn');
+    $('stLabel').textContent=LABEL[s.status]||s.status;
+    var m = s.status==='ready' ? 'ready' : (s.status==='qr' ? 'qr' : 'wait');
+    if(m!==mode){
+      mode=m; qrV=-1;
+      $('qrPanel').style.display = m==='qr' ? 'block':'none';
+      $('connPanel').style.display = m==='ready' ? 'block':'none';
+      $('waitPanel').style.display = m==='wait' ? 'block':'none';
+      if(m==='ready'){ $('connNum').textContent = (s.info&&s.info.number) ? '+'+s.info.number : ''; }
+      if(m==='wait'){ $('waitTxt').textContent = s.status==='authenticating' ? 'Cargando la sesión…' : 'Conectando…'; }
+    }
+    if(m==='qr'){
+      if(s.qrDataUrl && s.qrVersion!==qrV){ qrV=s.qrVersion; qrImg.src=s.qrDataUrl; qrImg.style.display='block'; qrSpin.style.display='none'; }
+      else if(!s.qrDataUrl){ qrImg.style.display='none'; qrSpin.style.display='block'; }
+    }
+  }
+  tick(); setInterval(tick,3000);
+</script>
+</body></html>`);
+});
+
 // --- Health check (público, para EasyPanel/Cloudflare) ---
 app.get('/healthz', (req, res) => {
   try {
     db.prepare('SELECT 1').get();
-    res.json({ ok: true, db: 'ok', uptime: Math.round(process.uptime()) });
+    const wst = wa.getState();
+    res.json({ ok: true, db: 'ok', uptime: Math.round(process.uptime()), wa: wst.status });
   } catch (e) {
     res.status(503).json({ ok: false, db: 'error', error: e.message });
   }
@@ -3669,18 +3665,39 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Columen running on port ${PORT}`);
 });
 
+// Arranca la sesión de WhatsApp (whatsapp-web.js). El QR se muestra en /admin/conexion.
+// Blindado: cualquier fallo al iniciar WhatsApp NO debe tumbar el server (la landing y
+// el /admin tienen que seguir funcionando aunque WhatsApp no conecte).
+try {
+  wa.init({ onMessage: handleIncoming, onAck: handleAck });
+} catch (e) {
+  console.error('[wa] init lanzó una excepción (el server sigue igual):', e.message);
+}
+// Red de seguridad global: un rechazo no manejado del stack de WhatsApp/puppeteer
+// no debe crashear el proceso.
+process.on('unhandledRejection', (reason) => {
+  console.error('[proc] unhandledRejection:', reason && reason.message ? reason.message : reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[proc] uncaughtException:', err && err.message ? err.message : err);
+});
+
 // Graceful shutdown — drena conexiones, cierra DB, exit limpio
 let shuttingDown = false;
 function shutdown(sig) {
   if (shuttingDown) return;
   shuttingDown = true;
   console.log(`[shutdown] ${sig} recibido, cerrando…`);
-  const force = setTimeout(() => { console.error('[shutdown] timeout, forzando exit'); process.exit(1); }, 10000);
-  server.close(() => {
-    try { db.close(); } catch {}
-    clearTimeout(force);
-    console.log('[shutdown] cerrado limpio');
-    process.exit(0);
+  const force = setTimeout(() => { console.error('[shutdown] timeout, forzando exit'); process.exit(1); }, 15000);
+  // Cerrar WhatsApp limpio PRIMERO (flushea la sesión al disco para que sobreviva el redeploy),
+  // después drenar el server y cerrar la DB.
+  wa.close().catch(() => {}).finally(() => {
+    server.close(() => {
+      try { db.close(); } catch {}
+      clearTimeout(force);
+      console.log('[shutdown] cerrado limpio');
+      process.exit(0);
+    });
   });
 }
 process.on('SIGTERM', () => shutdown('SIGTERM'));
