@@ -3652,7 +3652,7 @@ app.get('/healthz', (req, res) => {
   try {
     db.prepare('SELECT 1').get();
     const wst = wa.getState();
-    res.json({ ok: true, db: 'ok', uptime: Math.round(process.uptime()), wa: wst.status, waErr: wst.status !== 'ready' && wst.lastError ? String(wst.lastError).slice(0, 140) : undefined });
+    res.json({ ok: true, db: 'ok', uptime: Math.round(process.uptime()), wa: wst.status });
   } catch (e) {
     res.status(503).json({ ok: false, db: 'error', error: e.message });
   }
