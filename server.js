@@ -248,6 +248,17 @@ runMigration('data_cleanup_consultas_2026_07_17', () => {
   db.prepare('DELETE FROM consultas WHERE id <= 7').run();
 });
 
+runMigration('data_cleanup_inbox_2026_07_17', () => {
+  // Segunda parte de la limpieza: el inbox arranca limpio para el cliente.
+  // Se conserva solo el chat de hoy (el de la consulta id 8). Snapshot previo hecho.
+  const keep = '13159830130785';
+  db.prepare('DELETE FROM messages WHERE telefono <> ?').run(keep);
+  db.prepare('DELETE FROM conversations WHERE telefono <> ?').run(keep);
+  db.prepare('DELETE FROM conversation_labels WHERE telefono <> ?').run(keep);
+  db.prepare('DELETE FROM bot_state WHERE telefono <> ?').run(keep);
+  db.prepare('DELETE FROM chat_ids WHERE telefono <> ?').run(keep);
+});
+
 // Cleanup old sessions (older than 24h) y processed_messages (older than 7 días)
 db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
 db.exec(`DELETE FROM processed_messages WHERE processed_at < datetime('now', '-7 days')`);
