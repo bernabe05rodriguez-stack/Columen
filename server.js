@@ -241,6 +241,13 @@ runMigration('add_chat_ids_2026_07', () => {
   )`);
 });
 
+runMigration('data_cleanup_consultas_2026_07_17', () => {
+  // Limpieza de datos pedida por el dueño al poner en marcha el WhatsApp nuevo:
+  // las consultas id 1-7 eran pruebas de abril/mayo; queda solo la real (id 8).
+  // Hay snapshot pre-limpieza local + off-site del 2026-07-17.
+  db.prepare('DELETE FROM consultas WHERE id <= 7').run();
+});
+
 // Cleanup old sessions (older than 24h) y processed_messages (older than 7 días)
 db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
 db.exec(`DELETE FROM processed_messages WHERE processed_at < datetime('now', '-7 days')`);
