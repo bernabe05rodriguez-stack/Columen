@@ -230,6 +230,17 @@ runMigration('add_blog_posts_2026_06', () => {
   db.exec('CREATE INDEX IF NOT EXISTS idx_posts_pub ON posts(published, created_at DESC)');
 });
 
+runMigration('add_chat_ids_2026_07', () => {
+  // Aditiva: WhatsApp puede identificar remitentes con un LID (@lid) en vez del
+  // número real (rollout de privacidad, frecuente hablándole a cuentas Business).
+  // A esos chats no se les puede enviar como <digitos>@c.us ("No LID for user"),
+  // así que guardamos el JID exacto de cada chat entrante y respondemos por ahí.
+  db.exec(`CREATE TABLE IF NOT EXISTS chat_ids (
+    telefono TEXT PRIMARY KEY,
+    chat_id TEXT NOT NULL
+  )`);
+});
+
 // Cleanup old sessions (older than 24h) y processed_messages (older than 7 días)
 db.exec(`DELETE FROM sessions WHERE created_at < datetime('now', '-1 day')`);
 db.exec(`DELETE FROM processed_messages WHERE processed_at < datetime('now', '-7 days')`);
@@ -3000,10 +3011,17 @@ function recordMessage(tel, direction, type, body, waId, mediaId, mediaMime) {
 // Todas las funciones devuelven { ok:true } o { error:{ message } } para mantener
 // la interfaz que ya usaban los endpoints del inbox.
 
+// Devuelve el JID exacto del chat si lo conocemos. Clave para remitentes @lid:
+// reconstruir <digitos>@c.us con un LID falla con "No LID for user".
+function chatIdFor(tel) {
+  try { return db.prepare('SELECT chat_id FROM chat_ids WHERE telefono = ?').get(String(tel))?.chat_id || null; }
+  catch { return null; }
+}
+
 // Envía texto y lo loguea en la DB como mensaje saliente.
 async function sendText(to, body) {
   try {
-    const msg = await wa.sendText(to, body);
+    const msg = await wa.sendText(chatIdFor(to) || to, body);
     logDebug({ kind: 'send_ok', to: maskTel(to), type: 'text' });
     recordMessage(to, 'out', 'text', body, msg?.id?._serialized || null);
     return { ok: true, id: msg?.id?._serialized || null };
@@ -3017,7 +3035,7 @@ async function sendText(to, body) {
 // Envía media (base64) y la guarda en /data/media para poder renderizarla en el inbox.
 async function sendMedia(to, { data, mimetype, filename, caption }) {
   try {
-    const msg = await wa.sendMedia(to, { data, mimetype, filename, caption });
+    const msg = await wa.sendMedia(chatIdFor(to) || to, { data, mimetype, filename, caption });
     let fileId = null;
     try { fileId = wa.saveBase64(data, mimetype, filename); } catch (e) { console.error('[wa] saveBase64 out', e.message); }
     const isImage = mimetype.startsWith('image/');
@@ -3133,8 +3151,21 @@ async function handleIncoming(msg) {
   try {
     if (!msg || msg.from === 'status@broadcast' || msg.isStatus) return;
     if (typeof msg.from === 'string' && msg.from.endsWith('@g.us')) return; // ignora grupos
-    const from = String(msg.from || '').split('@')[0];
+    const rawFrom = String(msg.from || '');
+    let from = rawFrom.split('@')[0];
     if (!from) return;
+
+    // Remitente identificado por LID (@lid): lo que va antes del @ NO es un teléfono.
+    // Si WhatsApp manda el número real (senderPn), usamos ese como clave; si no,
+    // queda el LID como clave. En ambos casos guardamos el JID exacto del chat,
+    // porque responder reconstruyendo <digitos>@c.us falla con "No LID for user".
+    if (rawFrom.endsWith('@lid')) {
+      const pn = String(msg._data?.senderPn || '').split('@')[0].replace(/[^\d]/g, '');
+      if (pn.length >= 8) from = pn;
+    }
+    try {
+      db.prepare('INSERT INTO chat_ids (telefono, chat_id) VALUES (?, ?) ON CONFLICT(telefono) DO UPDATE SET chat_id = excluded.chat_id').run(from, rawFrom);
+    } catch (e) { console.error('[wa] chat_ids upsert', e.message); }
 
     // Dedup atómico: INSERT OR IGNORE; si changes===0 el mensaje ya se procesó.
     const wid = msg.id?._serialized || null;
