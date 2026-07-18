@@ -241,6 +241,12 @@ runMigration('add_chat_ids_2026_07', () => {
   )`);
 });
 
+runMigration('add_push_name_2026_07', () => {
+  // Aditiva: nombre de perfil de WhatsApp del contacto (como se ve en el teléfono).
+  // Fallback de nombre en el inbox cuando el cliente no completó el flujo del bot.
+  db.exec('ALTER TABLE conversations ADD COLUMN push_name TEXT');
+});
+
 runMigration('data_cleanup_consultas_2026_07_17', () => {
   // Limpieza de datos pedida por el dueño al poner en marcha el WhatsApp nuevo:
   // las consultas id 1-7 eran pruebas de abril/mayo; queda solo la real (id 8).
@@ -1115,7 +1121,10 @@ function resolveName(tel) {
   const row = db.prepare("SELECT nombre FROM consultas WHERE telefono = ? AND nombre != '' ORDER BY id DESC LIMIT 1").get(tel);
   if (row?.nombre) return row.nombre;
   const st = db.prepare('SELECT nombre FROM bot_state WHERE telefono = ? AND nombre IS NOT NULL').get(tel);
-  return st?.nombre || '';
+  if (st?.nombre) return st.nombre;
+  // Fallback: el nombre de perfil de WhatsApp (igual que se ve en el teléfono)
+  try { return db.prepare('SELECT push_name FROM conversations WHERE telefono = ?').get(tel)?.push_name || ''; }
+  catch { return ''; }
 }
 
 function labelsForTel(tel) {
@@ -3112,6 +3121,7 @@ async function sendText(to, body) {
   try {
     const msg = await wa.sendText(chatIdFor(to) || to, body);
     logDebug({ kind: 'send_ok', to: maskTel(to), type: 'text' });
+    if (msg?.id?._serialized) markProcessed(msg.id._serialized); // evita doble registro vía message_create
     recordMessage(to, 'out', 'text', body, msg?.id?._serialized || null);
     return { ok: true, id: msg?.id?._serialized || null };
   } catch (err) {
@@ -3125,6 +3135,7 @@ async function sendText(to, body) {
 async function sendMedia(to, { data, mimetype, filename, caption }) {
   try {
     const msg = await wa.sendMedia(chatIdFor(to) || to, { data, mimetype, filename, caption });
+    if (msg?.id?._serialized) markProcessed(msg.id._serialized); // evita doble registro vía message_create
     let fileId = null;
     try { fileId = wa.saveBase64(data, mimetype, filename); } catch (e) { console.error('[wa] saveBase64 out', e.message); }
     const isImage = mimetype.startsWith('image/');
@@ -3235,39 +3246,50 @@ app.get('/bot-debug', (req, res) => {
 });
 
 // --- Handler de mensajes entrantes (whatsapp-web.js) ---
+// Resuelve el "teléfono" (clave del inbox) a partir del JID de un chat, y guarda
+// el mapeo en chat_ids para responder por el JID exacto.
+// JIDs @lid: lo que va antes del @ NO es un teléfono. Se resuelve el número real
+// por (en orden): senderPn del payload, mapeo ya guardado, o consulta a WhatsApp
+// (getContactLidAndPhone). Si nada resuelve, queda el LID como clave.
+async function resolveTelFromJid(rawJid, senderPn) {
+  const raw = String(rawJid || '');
+  let tel = raw.split('@')[0];
+  if (!tel) return null;
+  if (raw.endsWith('@lid')) {
+    const pn = String(senderPn || '').split('@')[0].replace(/[^\d]/g, '');
+    if (pn.length >= 8) {
+      tel = pn;
+    } else {
+      const cached = db.prepare('SELECT telefono FROM chat_ids WHERE chat_id = ?').get(raw)?.telefono;
+      if (cached && cached !== tel) {
+        tel = cached;
+      } else {
+        try {
+          const real = await wa.lidToPhone(raw);
+          if (real && real.length >= 8) tel = real;
+        } catch (e) { console.error('[wa] lidToPhone', e.message); }
+      }
+    }
+  }
+  try {
+    db.prepare('INSERT INTO chat_ids (telefono, chat_id) VALUES (?, ?) ON CONFLICT(telefono) DO UPDATE SET chat_id = excluded.chat_id').run(tel, raw);
+  } catch (e) { console.error('[wa] chat_ids upsert', e.message); }
+  return tel;
+}
+
+// Guarda el nombre de perfil de WhatsApp del contacto (como aparece en el teléfono).
+function notePushName(tel, name) {
+  if (!tel || !name) return;
+  try { db.prepare('UPDATE conversations SET push_name = ? WHERE telefono = ? AND (push_name IS NULL OR push_name <> ?)').run(String(name), tel, String(name)); } catch {}
+}
+
 // Reemplaza al webhook de Meta. Se engancha vía wa.init({ onMessage: handleIncoming }).
 async function handleIncoming(msg) {
   try {
     if (!msg || msg.from === 'status@broadcast' || msg.isStatus) return;
     if (typeof msg.from === 'string' && msg.from.endsWith('@g.us')) return; // ignora grupos
-    const rawFrom = String(msg.from || '');
-    let from = rawFrom.split('@')[0];
+    const from = await resolveTelFromJid(msg.from, msg._data?.senderPn);
     if (!from) return;
-
-    // Remitente identificado por LID (@lid): lo que va antes del @ NO es un teléfono.
-    // Clave del inbox = número real, resuelto por (en orden): senderPn del payload,
-    // mapeo ya guardado en chat_ids, o consulta a WhatsApp (getContactLidAndPhone).
-    // Si nada resuelve, queda el LID como clave. En todos los casos guardamos el JID
-    // exacto del chat: responder reconstruyendo <digitos>@c.us falla con "No LID for user".
-    if (rawFrom.endsWith('@lid')) {
-      const pn = String(msg._data?.senderPn || '').split('@')[0].replace(/[^\d]/g, '');
-      if (pn.length >= 8) {
-        from = pn;
-      } else {
-        const cached = db.prepare('SELECT telefono FROM chat_ids WHERE chat_id = ?').get(rawFrom)?.telefono;
-        if (cached && cached !== from) {
-          from = cached;
-        } else {
-          try {
-            const real = await wa.lidToPhone(rawFrom);
-            if (real && real.length >= 8) from = real;
-          } catch (e) { console.error('[wa] lidToPhone', e.message); }
-        }
-      }
-    }
-    try {
-      db.prepare('INSERT INTO chat_ids (telefono, chat_id) VALUES (?, ?) ON CONFLICT(telefono) DO UPDATE SET chat_id = excluded.chat_id').run(from, rawFrom);
-    } catch (e) { console.error('[wa] chat_ids upsert', e.message); }
 
     // Dedup atómico: INSERT OR IGNORE; si changes===0 el mensaje ya se procesó.
     const wid = msg.id?._serialized || null;
@@ -3286,6 +3308,7 @@ async function handleIncoming(msg) {
       const caption = (msg.body || '').trim();
       const body = caption ? `${label}\n${caption}` : label;
       recordMessage(from, 'in', kind, body, wid, saved?.fileId || null, saved?.mimetype || null);
+      notePushName(from, msg._data?.notifyName);
       if (isPaused()) return;
       return sendText(from, 'Gracias por tu mensaje. Para atenderte mejor, escribinos en texto así podemos tomar tus datos y un profesional te contacta a la brevedad.');
     }
@@ -3293,6 +3316,7 @@ async function handleIncoming(msg) {
     // Tipos no-texto sin media (ubicación, contacto, etc.)
     if (msg.type !== 'chat') {
       recordMessage(from, 'in', msg.type || 'other', `[${msg.type || 'mensaje'}]`, wid);
+      notePushName(from, msg._data?.notifyName);
       if (isPaused()) return;
       return sendText(from, 'Gracias por tu mensaje. Para atenderte mejor, escribinos en texto así podemos tomar tus datos y un profesional te contacta a la brevedad.');
     }
@@ -3300,6 +3324,7 @@ async function handleIncoming(msg) {
     // Texto
     const body = msg.body || '';
     recordMessage(from, 'in', 'text', body, wid);
+    notePushName(from, msg._data?.notifyName);
     logDebug({ kind: 'msg_in', from: maskTel(from) });
     if (isPaused()) return;
     const state = getState(from);
@@ -3313,6 +3338,107 @@ async function handleIncoming(msg) {
 // Actualiza el tick/estado de un mensaje saliente (evento message_ack).
 function handleAck(waId, status) {
   try { db.prepare('UPDATE messages SET status = ? WHERE wa_id = ?').run(status, waId); } catch {}
+}
+
+// Cuerpo/etiqueta legible para un mensaje según su tipo (para registrar sin descargar media).
+function msgLabel(msg) {
+  const t = msg.type;
+  if (t === 'chat') return msg.body || '';
+  if (t === 'image') return msg.body ? '📷 Foto\n' + msg.body : '📷 Foto';
+  if (t === 'video') return msg.body ? '🎥 Video\n' + msg.body : '🎥 Video';
+  if (t === 'ptt' || t === 'audio') return '🎤 Audio';
+  if (t === 'sticker') return '⭐ Sticker';
+  if (t === 'document') return `📄 ${msg._data?.filename || 'Documento'}`;
+  return `[${t || 'mensaje'}]`;
+}
+
+// ESPEJO ←: mensajes que la propia cuenta manda DESDE EL TELÉFONO (u otro dispositivo).
+// Los registra como salientes y pausa el bot en ese chat (un humano tomó la conversación),
+// igual que cuando se responde desde el panel web.
+async function handleOutgoingCreate(msg) {
+  try {
+    if (!msg || !msg.fromMe) return;
+    const rawTo = String(msg.to || '');
+    if (!rawTo || rawTo === 'status@broadcast' || rawTo.endsWith('@g.us')) return;
+    // Pequeña espera: los envíos hechos por el propio server también disparan
+    // message_create; el delay garantiza que sendText ya los marcó como procesados.
+    await new Promise(r => setTimeout(r, 1500));
+    const wid = msg.id?._serialized || null;
+    if (wid && _markProcessed.run(wid).changes === 0) return; // ya registrado (envío del panel/bot)
+    const tel = await resolveTelFromJid(rawTo, msg._data?.recipientPn);
+    if (!tel) return;
+    let saved = null;
+    if (msg.hasMedia) { try { saved = await wa.saveIncomingMedia(msg); } catch {} }
+    const type = msg.type === 'chat' ? 'text' : (msg.type === 'ptt' ? 'audio' : (msg.type || 'text'));
+    recordMessage(tel, 'out', type, msgLabel(msg), wid, saved?.fileId || null, saved?.mimetype || null);
+    db.prepare('UPDATE conversations SET bot_paused = 1 WHERE telefono = ?').run(tel);
+    try { db.prepare('DELETE FROM bot_state WHERE telefono = ?').run(tel); } catch {}
+    logDebug({ kind: 'out_from_phone', to: maskTel(tel), type: msg.type });
+  } catch (err) {
+    console.error('[wa] handleOutgoingCreate error', err.message);
+  }
+}
+
+// ESPEJO →: si el cliente LEE un chat en su teléfono, el badge de no-leídos
+// del panel web se limpia también (como WhatsApp Web de verdad).
+async function handleUnreadSync(chat) {
+  try {
+    if (!chat || chat.isGroup) return;
+    if ((chat.unreadCount || 0) !== 0) return;
+    const raw = chat.id?._serialized || '';
+    if (!raw) return;
+    const tel = db.prepare('SELECT telefono FROM chat_ids WHERE chat_id = ?').get(raw)?.telefono || raw.split('@')[0];
+    db.prepare('UPDATE conversations SET unread = 0 WHERE telefono = ? AND unread > 0').run(tel);
+  } catch (err) {
+    console.error('[wa] handleUnreadSync error', err.message);
+  }
+}
+
+// RESPALDO al reconectar: mientras el server estuvo caído (p.ej. un redeploy),
+// el WhatsApp del teléfono siguió andando. Al volver, traemos los últimos mensajes
+// de los chats recientes y registramos los que nos perdimos (sin re-disparar el bot).
+async function syncMissedMessages() {
+  let msgs = [];
+  try { msgs = await wa.fetchRecentMessages(12, 25); } catch (e) { console.error('[wa] syncMissed fetch', e.message); return; }
+  let added = 0;
+  for (const m of msgs) {
+    try {
+      if (!m || m.isStatus) continue;
+      const rawChat = String(m.fromMe ? m.to : m.from || '');
+      if (!rawChat || rawChat === 'status@broadcast' || rawChat.endsWith('@g.us')) continue;
+      const wid = m.id?._serialized || null;
+      if (!wid || _markProcessed.run(wid).changes === 0) continue; // ya lo teníamos
+      const tel = await resolveTelFromJid(rawChat, m.fromMe ? m._data?.recipientPn : m._data?.senderPn);
+      if (!tel) continue;
+      const dir = m.fromMe ? 'out' : 'in';
+      const type = m.type === 'chat' ? 'text' : (m.type === 'ptt' ? 'audio' : (m.type || 'text'));
+      const ts = m.timestamp ? new Date(m.timestamp * 1000) : new Date();
+      const createdAt = ts.getFullYear() + '-' + String(ts.getMonth() + 1).padStart(2, '0') + '-' + String(ts.getDate()).padStart(2, '0')
+        + ' ' + String(ts.getHours()).padStart(2, '0') + ':' + String(ts.getMinutes()).padStart(2, '0') + ':' + String(ts.getSeconds()).padStart(2, '0');
+      db.prepare('INSERT INTO messages (wa_id, telefono, direction, type, body, created_at) VALUES (?,?,?,?,?,?)')
+        .run(wid, tel, dir, type, msgLabel(m), createdAt);
+      // Actualiza el resumen de la conversación solo si este mensaje es el más nuevo
+      const conv = db.prepare('SELECT last_at, unread FROM conversations WHERE telefono = ?').get(tel);
+      if (!conv) {
+        db.prepare('INSERT INTO conversations (telefono, last_body, last_at, last_direction, unread) VALUES (?,?,?,?,?)')
+          .run(tel, msgLabel(m), createdAt, dir, dir === 'in' ? 1 : 0);
+      } else {
+        if (!conv.last_at || createdAt > conv.last_at) {
+          db.prepare('UPDATE conversations SET last_body=?, last_at=?, last_direction=? WHERE telefono=?').run(msgLabel(m), createdAt, dir, tel);
+        }
+        if (dir === 'in') db.prepare('UPDATE conversations SET unread = unread + 1 WHERE telefono = ?').run(tel);
+      }
+      if (m.fromMe) db.prepare('UPDATE conversations SET bot_paused = 1 WHERE telefono = ?').run(tel);
+      if (!m.fromMe && m._data?.notifyName) notePushName(tel, m._data.notifyName);
+      added++;
+    } catch (e) { console.error('[wa] syncMissed msg', e.message); }
+  }
+  if (added) console.log('[wa] syncMissedMessages: respaldados', added, 'mensajes perdidos');
+}
+
+async function onWaReady() {
+  await repairLidTelefonos();
+  await syncMissedMessages();
 }
 
 // Re-clavea a su número real las filas guardadas con un LID como "teléfono"
@@ -3832,7 +3958,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 // Blindado: cualquier fallo al iniciar WhatsApp NO debe tumbar el server (la landing y
 // el /admin tienen que seguir funcionando aunque WhatsApp no conecte).
 try {
-  wa.init({ onMessage: handleIncoming, onAck: handleAck, onReady: repairLidTelefonos });
+  wa.init({ onMessage: handleIncoming, onAck: handleAck, onReady: onWaReady, onOutgoing: handleOutgoingCreate, onUnread: handleUnreadSync });
 } catch (e) {
   console.error('[wa] init lanzó una excepción (el server sigue igual):', e.message);
 }

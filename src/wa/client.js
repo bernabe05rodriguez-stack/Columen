@@ -52,7 +52,7 @@ const state = {
 };
 
 let client = null;
-let callbacks = { onMessage: null, onAck: null, onReady: null };
+let callbacks = { onMessage: null, onAck: null, onReady: null, onOutgoing: null, onUnread: null };
 let relinking = false;
 let lastQrString = null;
 let everReady = false;  // ¿alguna vez llegó a estar conectado en esta corrida?
@@ -188,6 +188,20 @@ function buildClient() {
     catch (e) { console.error('[wa] onMessage handler error', e.message); }
   });
 
+  // Mensajes creados por la PROPIA cuenta — incluye los que el cliente manda
+  // DESDE SU TELÉFONO (otros dispositivos). Es la mitad "espejo" de la sincronización.
+  c.on('message_create', async (msg) => {
+    try { if (msg?.fromMe && callbacks.onOutgoing) await callbacks.onOutgoing(msg); }
+    catch (e) { console.error('[wa] onOutgoing handler error', e.message); }
+  });
+
+  // Cambios de no-leídos: si el cliente LEE un chat en el teléfono, acá llega
+  // unreadCount=0 y el panel web puede limpiar el badge.
+  c.on('unread_count', async (chat) => {
+    try { if (callbacks.onUnread) await callbacks.onUnread(chat); }
+    catch (e) { console.error('[wa] onUnread handler error', e.message); }
+  });
+
   c.on('message_ack', (msg, ack) => {
     // ack: 1=server(sent) 2=device(delivered) 3=read 4=played
     try {
@@ -245,10 +259,12 @@ async function start({ wipe } = {}) {
   }
 }
 
-function init({ onMessage, onAck, onReady } = {}) {
+function init({ onMessage, onAck, onReady, onOutgoing, onUnread } = {}) {
   callbacks.onMessage = onMessage || null;
   callbacks.onAck = onAck || null;
   callbacks.onReady = onReady || null;
+  callbacks.onOutgoing = onOutgoing || null;
+  callbacks.onUnread = onUnread || null;
   if (client) return client;
   start().catch(() => {}); // el supervisor crea el client, lo inicializa y reintenta solo
   return client;
@@ -283,6 +299,20 @@ async function sendMedia(to, media) {
   const mm = new MessageMedia(media.mimetype, media.data, media.filename || undefined);
   const msg = await client.sendMessage(toChatId(to), mm, { caption: media.caption || undefined });
   return msg;
+}
+
+// Trae los últimos mensajes de los chats individuales más recientes.
+// Se usa al reconectar para respaldar lo que pasó mientras el server estuvo caído
+// (p.ej. durante un redeploy): el teléfono siguió recibiendo/mandando y la web no.
+async function fetchRecentMessages(nChats, nMsgs) {
+  ensureReady();
+  const chats = (await client.getChats()).filter(ch => ch && !ch.isGroup);
+  chats.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  const out = [];
+  for (const ch of chats.slice(0, nChats)) {
+    try { out.push(...await ch.fetchMessages({ limit: nMsgs })); } catch {}
+  }
+  return out;
 }
 
 // Resuelve el número real de un remitente identificado por LID (@lid).
@@ -410,7 +440,7 @@ async function relink() {
 
 module.exports = {
   init, getState,
-  sendText, sendMedia, resolveNumber, lidToPhone, requestPairingCode,
+  sendText, sendMedia, resolveNumber, lidToPhone, fetchRecentMessages, requestPairingCode,
   saveIncomingMedia, saveBase64, mediaPath,
   reconnect, relink, close,
   MEDIA_DIR, SESSION_DIR,
