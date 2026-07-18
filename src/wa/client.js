@@ -293,6 +293,15 @@ async function sendText(to, body) {
   return msg;
 }
 
+// Muestra/oculta el "escribiendo…" en el chat del destinatario (para humanizar al bot).
+// Mandar un mensaje limpia el estado solo, así que rara vez hace falta el off explícito.
+async function setTyping(to, on) {
+  ensureReady();
+  const chat = await client.getChatById(toChatId(to));
+  if (on) await chat.sendStateTyping();
+  else await chat.clearState();
+}
+
 // media: { data(base64), mimetype, filename, caption }
 async function sendMedia(to, media) {
   ensureReady();
@@ -440,7 +449,7 @@ async function relink() {
 
 module.exports = {
   init, getState,
-  sendText, sendMedia, resolveNumber, lidToPhone, fetchRecentMessages, requestPairingCode,
+  sendText, sendMedia, setTyping, resolveNumber, lidToPhone, fetchRecentMessages, requestPairingCode,
   saveIncomingMedia, saveBase64, mediaPath,
   reconnect, relink, close,
   MEDIA_DIR, SESSION_DIR,

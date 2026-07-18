@@ -3326,9 +3326,34 @@ async function sendMedia(to, { data, mimetype, filename, caption }) {
   }
 }
 
+// Respuesta HUMANIZADA del bot (anti-ban): pausa de "lectura" + "escribiendo…"
+// proporcional al largo del mensaje, con azar en cada respuesta para que nunca
+// conteste dos veces a la misma velocidad. Solo la usa el bot — lo que se manda
+// desde el panel sale al instante (ahí el humano ya tipeó de verdad).
+const _rnd = (a, b) => a + Math.random() * (b - a);
+const _sleep = ms => new Promise(r => setTimeout(r, ms));
+async function sendBotReply(tel, body) {
+  try {
+    const readMs = _rnd(1500, 4000);                                   // "leyendo" el mensaje del cliente
+    const typeMs = Math.min(9000, 800 + String(body).length * _rnd(35, 65)); // "tipeando" según el largo
+    await _sleep(readMs);
+    try { await wa.setTyping(chatIdFor(tel) || tel, true); } catch {}
+    await _sleep(typeMs);
+    // No hace falta apagar el "escribiendo…": el envío del mensaje lo limpia solo.
+  } catch {}
+  // Si mientras "escribía" un humano tomó el chat (panel o teléfono), el bot se calla.
+  try {
+    if (db.prepare('SELECT bot_paused FROM conversations WHERE telefono = ?').get(tel)?.bot_paused) {
+      try { await wa.setTyping(chatIdFor(tel) || tel, false); } catch {}
+      return { ok: false, skipped: 'humano tomó el chat durante la espera' };
+    }
+  } catch {}
+  return sendText(tel, body);
+}
+
 // Mensaje de bienvenida (menú de texto — WhatsApp común no soporta botones interactivos).
 function sendWelcome(to) {
-  return sendText(to,
+  return sendBotReply(to,
     'Hola! Bienvenido a *COLUMEN* — Estudio Legal & Notarial.\n\n' +
     'Para orientarte mejor, respondé con el número del área de tu consulta:\n\n' +
     '*1*  Jurídico\n' +
@@ -3371,44 +3396,44 @@ async function handleTextInFlow(from, text) {
     let area = null;
     if (/^\s*1\b/.test(t) || t.includes('jur')) area = 'juridico';
     else if (/^\s*2\b/.test(t) || t.includes('not')) area = 'notarial';
-    if (!area) return sendText(from, 'No te entendí. Respondé con *1* para Jurídico o *2* para Notarial:');
+    if (!area) return sendBotReply(from,'No te entendí. Respondé con *1* para Jurídico o *2* para Notarial:');
     const label = area === 'juridico' ? 'Jurídico' : 'Notarial';
     setState(from, { step: 'nombre', area });
-    return sendText(from, `Perfecto! Consulta *${label}* seleccionada.\n\nVamos a tomar tus datos. Por favor, escribí tu *nombre completo*:`);
+    return sendBotReply(from,`Perfecto! Consulta *${label}* seleccionada.\n\nVamos a tomar tus datos. Por favor, escribí tu *nombre completo*:`);
   }
 
   if (state.step === 'nombre') {
-    if (clean.length < 2) return sendText(from, 'El nombre parece muy corto. Por favor escribí tu nombre completo:');
+    if (clean.length < 2) return sendBotReply(from,'El nombre parece muy corto. Por favor escribí tu nombre completo:');
     setState(from, { step: 'dni', nombre: clean });
-    return sendText(from, `Gracias ${clean.split(' ')[0]}.\n\nAhora tu *número de DNI* (solo números):`);
+    return sendBotReply(from,`Gracias ${clean.split(' ')[0]}.\n\nAhora tu *número de DNI* (solo números):`);
   }
 
   if (state.step === 'dni') {
     const digits = clean.replace(/[.\s-]/g, '');
     if (!/^\d{7,10}$/.test(digits)) {
-      return sendText(from, 'DNI inválido. Escribí solo los números (7 a 10 dígitos):');
+      return sendBotReply(from,'DNI inválido. Escribí solo los números (7 a 10 dígitos):');
     }
     setState(from, { step: 'email', dni: digits });
-    return sendText(from, 'Perfecto.\n\nAhora tu *email*:');
+    return sendBotReply(from,'Perfecto.\n\nAhora tu *email*:');
   }
 
   if (state.step === 'email') {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean)) {
-      return sendText(from, 'El email no parece válido. Probá de nuevo:');
+      return sendBotReply(from,'El email no parece válido. Probá de nuevo:');
     }
     setState(from, { step: 'consulta', email: clean });
-    return sendText(from, 'Último paso.\n\n*Contanos brevemente tu consulta*:');
+    return sendBotReply(from,'Último paso.\n\n*Contanos brevemente tu consulta*:');
   }
 
   if (state.step === 'consulta') {
-    if (clean.length < 5) return sendText(from, 'Por favor describí un poco más tu consulta:');
+    if (clean.length < 5) return sendBotReply(from,'Por favor describí un poco más tu consulta:');
     const final = getState(from);
     db.prepare('INSERT INTO consultas (telefono, area, nombre, dni, email, consulta) VALUES (?,?,?,?,?,?)').run(
       from, final.area || '', final.nombre || '', final.dni || '', final.email || '', clean
     );
     snapshotDB('consulta');
     clearState(from);
-    return sendText(from, `Gracias ${final.nombre?.split(' ')[0] || ''}! Tu consulta de tipo *${final.area === 'juridico' ? 'Jurídico' : 'Notarial'}* fue registrada correctamente.\n\nUn profesional de COLUMEN se va a comunicar con vos a la brevedad.`);
+    return sendBotReply(from,`Gracias ${final.nombre?.split(' ')[0] || ''}! Tu consulta de tipo *${final.area === 'juridico' ? 'Jurídico' : 'Notarial'}* fue registrada correctamente.\n\nUn profesional de COLUMEN se va a comunicar con vos a la brevedad.`);
   }
 }
 
@@ -3484,7 +3509,7 @@ async function handleIncoming(msg) {
       recordMessage(from, 'in', kind, body, wid, saved?.fileId || null, saved?.mimetype || null);
       notePushName(from, msg._data?.notifyName);
       if (isPaused()) return;
-      return sendText(from, 'Gracias por tu mensaje. Para atenderte mejor, escribinos en texto así podemos tomar tus datos y un profesional te contacta a la brevedad.');
+      return sendBotReply(from,'Gracias por tu mensaje. Para atenderte mejor, escribinos en texto así podemos tomar tus datos y un profesional te contacta a la brevedad.');
     }
 
     // Tipos no-texto sin media (ubicación, contacto, etc.)
@@ -3492,7 +3517,7 @@ async function handleIncoming(msg) {
       recordMessage(from, 'in', msg.type || 'other', `[${msg.type || 'mensaje'}]`, wid);
       notePushName(from, msg._data?.notifyName);
       if (isPaused()) return;
-      return sendText(from, 'Gracias por tu mensaje. Para atenderte mejor, escribinos en texto así podemos tomar tus datos y un profesional te contacta a la brevedad.');
+      return sendBotReply(from,'Gracias por tu mensaje. Para atenderte mejor, escribinos en texto así podemos tomar tus datos y un profesional te contacta a la brevedad.');
     }
 
     // Texto
