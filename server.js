@@ -2324,8 +2324,10 @@ app.get('/admin/inbox', (req, res) => {
     }).join('');
     el.innerHTML = '<button class="label-chip'+(state.filterLabels.size?'':' active')+'" id="chipAll">Todos</button>' + chips;
     $('#chipAll')?.addEventListener('click', () => { state.filterLabels.clear(); renderLabelFilter(); renderSidebar(); });
-    el.querySelectorAll('.label-chip').forEach(n => n.addEventListener('click', () => {
+    // Solo los chips de etiqueta real (con data-id): el chip "Todos" tiene su propio handler
+    el.querySelectorAll('.label-chip[data-id]').forEach(n => n.addEventListener('click', () => {
       const id = parseInt(n.dataset.id,10);
+      if (Number.isNaN(id)) return;
       if (state.filterLabels.has(id)) state.filterLabels.delete(id);
       else state.filterLabels.add(id);
       renderLabelFilter();
