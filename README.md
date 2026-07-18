@@ -12,7 +12,7 @@ Admin: https://columen.ar/admin
 - **whatsapp-web.js + Chromium** (número propio vinculado por QR; sesión `LocalAuth` en `/data/wa-session`, media entrante en `/data/media`). Supervisor en `src/wa/client.js`: auto-reconexión, limpieza de locks de Chromium, versión de WhatsApp Web vendored en `src/wa/webcache/`
 - **EasyPanel** (`redhawk/columen`) sobre Docker (Debian slim + Chromium del sistema), dominio propio con Let's Encrypt
 - **Cloudflare DNS** (`columen.ar` → `84.46.252.202`, DNS only sin proxy)
-- **Backups**: snapshots locales en `/data/backups/` (50 más recientes) + push off-site a un repo privado de GitHub vía Contents API
+- **Backups**: snapshots locales en `/data/backups/` (50 más recientes) + push off-site a un repo privado de GitHub vía Contents API (`snapshots/latest.db`, un daily por día, y los archivos de `/data/media` de forma incremental). Estado visible en `/admin/backup` (semáforos local/off-site/media) + botón "Hacer backup ahora" (`POST /admin/backup/run`). La sesión de WhatsApp NO se respalda a propósito (riesgo de robo de cuenta; se recupera re-escaneando el QR)
 
 > Hasta 2026-07 el bot corría sobre Meta Cloud API. La migración completa está en el tag `meta-cloud-api` (rollback) y documentada en el vault de Obsidian.
 
@@ -40,7 +40,8 @@ Admin: https://columen.ar/admin
 | `POST/DELETE /admin/inbox/:tel/labels/:id` | Etiquetas por chat |
 | `GET/POST /admin/labels` · `DELETE /admin/labels/:id` | CRUD de etiquetas |
 | `GET /admin/media/:id` | Sirve media guardada en `/data/media` |
-| `GET /admin/backup` · `GET /admin/backup/download[?file=…]` | Snapshots DB |
+| `GET /admin/backup` · `GET /admin/backup/download[?file=…]` | Estado del backup + snapshots DB |
+| `POST /admin/backup/run` | Backup manual (local + off-site + media), espera el resultado real |
 | `GET /bot-debug` (auth) | Últimos eventos + estados del bot |
 
 ## Variables de entorno

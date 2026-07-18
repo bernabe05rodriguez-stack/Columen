@@ -74,6 +74,53 @@ async function pushBackupOffsite(localPath, repoPath) {
 }
 
 let backupRunning = false;
+// Estado observable del backup (lo muestra /admin/backup). En memoria alcanza:
+// el push de 'startup' lo re-puebla a segundos de cada arranque.
+const lastBackup = { localAt: null, localReason: null, offsiteAt: null, offsiteOk: null, offsiteError: null, mediaAt: null, mediaCount: 0 };
+
+// Sube al repo off-site los archivos de /data/media que todavía no estén (fotos,
+// audios y documentos que mandan los clientes). Incremental: 1 GET del listado +
+// PUT solo de los faltantes, con cap por corrida (la próxima hora sigue).
+const MEDIA_PUSH_CAP = 20;
+const MEDIA_MAX_BYTES = 90 * 1024 * 1024; // límite práctico de la Contents API
+async function pushMediaOffsite() {
+  if (!BACKUP_OFFSITE_TOKEN || !BACKUP_OFFSITE_REPO) return;
+  try {
+    const mediaDir = wa.MEDIA_DIR;
+    if (!mediaDir || !fs.existsSync(mediaDir)) return;
+    const locals = fs.readdirSync(mediaDir).filter(f => !f.startsWith('.'));
+    if (!locals.length) { lastBackup.mediaAt = new Date().toISOString(); return; }
+    const headers = {
+      Authorization: `Bearer ${BACKUP_OFFSITE_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    const listUrl = `https://api.github.com/repos/${BACKUP_OFFSITE_REPO}/contents/media?ref=${encodeURIComponent(BACKUP_OFFSITE_BRANCH)}`;
+    const existing = new Set();
+    try {
+      const r = await fetch(listUrl, { headers });
+      if (r.ok) for (const f of await r.json()) existing.add(f.name);
+      // 404 = la carpeta media/ todavía no existe en el repo: se crea con el primer PUT
+    } catch {}
+    let pushed = 0;
+    for (const f of locals) {
+      if (existing.has(f)) continue;
+      if (pushed >= MEDIA_PUSH_CAP) break;
+      try {
+        const size = fs.statSync(path.join(mediaDir, f)).size;
+        if (size > MEDIA_MAX_BYTES) { console.warn('[backup-media] salteado (muy grande):', f); continue; }
+        const ok = await pushBackupOffsite(path.join(mediaDir, f), `media/${f}`);
+        if (ok) pushed++;
+      } catch (e) { console.error('[backup-media]', f, e.message); }
+    }
+    lastBackup.mediaAt = new Date().toISOString();
+    lastBackup.mediaCount = existing.size + pushed;
+    if (pushed) console.log('[backup-media] subidos', pushed, 'archivos nuevos');
+  } catch (e) {
+    console.error('[backup-media] error', e.message);
+  }
+}
+
 async function snapshotDB(reason = 'periodic') {
   if (backupRunning) return;
   backupRunning = true;
@@ -86,14 +133,27 @@ async function snapshotDB(reason = 'periodic') {
       try { fs.unlinkSync(path.join(BACKUP_DIR, files.shift())); } catch {}
     }
     console.log('[backup] snapshot', reason, path.basename(dst));
+    lastBackup.localAt = new Date().toISOString();
+    lastBackup.localReason = reason;
     if (reason === 'hourly' || reason === 'startup' || reason === 'manual') {
       const today = new Date().toISOString().slice(0, 10);
-      (async () => {
+      const offsiteJob = (async () => {
+        if (!BACKUP_OFFSITE_TOKEN || !BACKUP_OFFSITE_REPO) return; // sin off-site configurado (dev local)
         try {
-          await pushBackupOffsite(dst, 'snapshots/latest.db');
-          await pushBackupOffsite(dst, `snapshots/daily/columen-${today}.db`);
-        } catch {}
+          const ok1 = await pushBackupOffsite(dst, 'snapshots/latest.db');
+          const ok2 = await pushBackupOffsite(dst, `snapshots/daily/columen-${today}.db`);
+          lastBackup.offsiteAt = new Date().toISOString();
+          lastBackup.offsiteOk = !!(ok1 && ok2);
+          lastBackup.offsiteError = lastBackup.offsiteOk ? null : 'GitHub rechazó la subida (ver logs del server)';
+          await pushMediaOffsite();
+        } catch (e) {
+          lastBackup.offsiteAt = new Date().toISOString();
+          lastBackup.offsiteOk = false;
+          lastBackup.offsiteError = e.message;
+        }
       })();
+      // El backup manual espera al off-site para poder informar el resultado real.
+      if (reason === 'manual') await offsiteJob;
     }
   } catch (e) {
     console.error('[backup] error', e.message);
@@ -856,12 +916,53 @@ app.get('/admin/backup', (req, res) => {
     ? fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.db')).sort().reverse()
     : [];
   const liveSize = fs.existsSync(DB_PATH) ? (fs.statSync(DB_PATH).size / 1024).toFixed(1) : '?';
-  const list = files.map(f => {
+
+  // Etiquetas humanas para los motivos de snapshot (los filenames traen el reason)
+  const REASON_LABELS = { startup: 'al encender', hourly: 'automático', consulta: 'consulta nueva', blog: 'cambio en el blog', manual: 'manual', periodic: 'automático' };
+  const hoyLocal = db.prepare("SELECT date('now','localtime') AS d, date('now','localtime','-1 day') AS a").get();
+  function prettySnapTime(dateStr, timeStr) {
+    const hhmm = timeStr.slice(0, 5).replace('-', ':');
+    if (dateStr === hoyLocal.d) return `Hoy ${hhmm}`;
+    if (dateStr === hoyLocal.a) return `Ayer ${hhmm}`;
+    return `${dateStr.slice(8,10)}/${dateStr.slice(5,7)} ${hhmm}`;
+  }
+  // "hace X" en criollo a partir de un ISO
+  function agoEs(iso) {
+    if (!iso) return null;
+    const s = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    if (s < 90) return 'hace un momento';
+    const min = Math.round(s / 60);
+    if (min < 60) return `hace ${min} min`;
+    const h = Math.round(min / 60);
+    if (h < 36) return `hace ${h} h`;
+    return `hace ${Math.round(h / 24)} días`;
+  }
+  const snapRow = f => {
     const size = (fs.statSync(path.join(BACKUP_DIR, f)).size / 1024).toFixed(1);
     const m = f.match(/columen-(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})-?(.*)\.db/);
-    const pretty = m ? `${m[1]} ${m[2].replace(/-/g,':')}${m[3] ? ` · <span class="reason">${escapeHtml(m[3])}</span>` : ''}` : escapeHtml(f);
-    return `<tr><td><div class="when">${pretty}</div><code class="fn">${escapeHtml(f)}</code></td><td class="muted nowrap">${size} KB</td><td class="nowrap"><a class="dl" href="/admin/backup/download?file=${encodeURIComponent(f)}">Descargar</a></td></tr>`;
-  }).join('');
+    const pretty = m
+      ? `${prettySnapTime(m[1], m[2])}${m[3] ? ` <span class="reason">${escapeHtml(REASON_LABELS[m[3]] || m[3])}</span>` : ''}`
+      : escapeHtml(f);
+    return `<tr><td><div class="when">${pretty}</div></td><td class="muted nowrap">${size} KB</td><td class="nowrap"><a class="dl" href="/admin/backup/download?file=${encodeURIComponent(f)}">Descargar</a></td></tr>`;
+  };
+  const listRecent = files.slice(0, 10).map(snapRow).join('');
+  const listOlder = files.slice(10).map(snapRow).join('');
+
+  // Semáforos del estado (lastBackup se llena en snapshotDB/pushMediaOffsite)
+  const offsiteConfigured = !!(BACKUP_OFFSITE_TOKEN && BACKUP_OFFSITE_REPO);
+  const stLocal = lastBackup.localAt
+    ? { cls: 'ok', txt: `Última copia: <b>${agoEs(lastBackup.localAt)}</b> (${escapeHtml(REASON_LABELS[lastBackup.localReason] || lastBackup.localReason || '')})` }
+    : { cls: 'warn2', txt: 'Todavía no corrió ningún backup desde el arranque' };
+  const stOffsite = !offsiteConfigured
+    ? { cls: 'bad', txt: 'Copia externa NO configurada' }
+    : lastBackup.offsiteOk === true
+      ? { cls: 'ok', txt: `Copia externa (GitHub privado): <b>al día</b> · ${agoEs(lastBackup.offsiteAt)}` }
+      : lastBackup.offsiteOk === false
+        ? { cls: 'bad', txt: `Copia externa FALLANDO ${agoEs(lastBackup.offsiteAt) || ''}: ${escapeHtml(lastBackup.offsiteError || '')}` }
+        : { cls: 'warn2', txt: 'Copia externa: esperando la primera subida desde el arranque…' };
+  const stMedia = lastBackup.mediaAt
+    ? { cls: 'ok', txt: `Fotos y documentos respaldados: <b>${lastBackup.mediaCount}</b> archivo${lastBackup.mediaCount === 1 ? '' : 's'} · ${agoEs(lastBackup.mediaAt)}` }
+    : { cls: 'warn2', txt: 'Fotos y documentos: se respaldan junto con la próxima corrida' };
 
   // Snapshot textual de consultas (solo lectura, no modifica nada)
   const allConsultas = db.prepare(
@@ -971,6 +1072,28 @@ app.get('/admin/backup', (req, res) => {
   .dl:hover{background:var(--gold);color:var(--cream);border-color:var(--gold)}
   .dl::before{content:'↓';font-size:14px;line-height:1}
   .empty{color:var(--ink-55);font-size:14px;text-align:center;padding:32px 0;font-style:italic}
+  /* Estado del backup (semáforos) */
+  .status-list{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+  .status-row{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.5;color:var(--ink)}
+  .status-row .light{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:5px}
+  .status-row.ok .light{background:#2eaf62;box-shadow:0 0 0 3px rgba(46,175,98,.15)}
+  .status-row.warn2 .light{background:#d9a520;box-shadow:0 0 0 3px rgba(217,165,32,.15)}
+  .status-row.bad .light{background:#cf4a35;box-shadow:0 0 0 3px rgba(207,74,53,.15)}
+  .status-row b{color:var(--navy)}
+  .how{margin-top:16px;padding-top:16px;border-top:1px dashed var(--cream-border);color:var(--ink-55);font-size:13.5px;line-height:1.7}
+  .how b{color:var(--navy);font-weight:600}
+  .actions-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+  .btn.gold{background:var(--gold)}
+  .btn.gold:hover{background:#77601f}
+  .btn:disabled{opacity:.6;cursor:wait}
+  .run-result{font-size:13px;margin-top:10px;display:none}
+  .run-result.ok{display:block;color:#1f7a45;font-weight:600}
+  .run-result.bad{display:block;color:#a53a28;font-weight:600}
+  details.older{margin-top:10px}
+  details.older summary{cursor:pointer;color:var(--gold);font-weight:600;font-size:12.5px;list-style:none;user-select:none;padding:6px 0}
+  details.older summary::-webkit-details-marker{display:none}
+  details.older summary::before{content:'▸ ';font-size:11px}
+  details.older[open] summary::before{content:'▾ '}
   /* Snapshot textual de consultas */
   .cs-actions{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
   .cs-actions .btn-sec{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;background:transparent;color:var(--gold);border:1.5px solid var(--cream-border);border-radius:8px;text-decoration:none;font-weight:600;font-size:12.5px;transition:background .2s,border-color .2s,color .2s}
@@ -1063,22 +1186,31 @@ app.get('/admin/backup', (req, res) => {
   <div class="page-head">
     <div>
       <h1>Backup</h1>
-      <div class="lead">Snapshots automáticos y descarga manual de la base de datos.</div>
+      <div class="lead">Las copias de seguridad se hacen solas. Esta página es para verificar que todo esté al día y descargar lo que necesites.</div>
     </div>
   </div>
-  <div class="warn">
-    <div class="warn-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-    <div><b>Persistencia crítica</b>Los backups viven en <code>/data/backups/</code>. Si <code>/data</code> no tiene volumen montado en EasyPanel, se pierden en cada rebuild junto con la DB principal. Descargá la DB actual periódicamente para guardar una copia off-site.</div>
+  <div class="card">
+    <h2>Estado del backup</h2>
+    <div class="meta">Se actualiza solo · datos protegidos: consultas, chats de WhatsApp, etiquetas y blog (${liveSize} KB)</div>
+    <div class="status-list">
+      <div class="status-row ${stLocal.cls}"><span class="light"></span><div>${stLocal.txt}</div></div>
+      <div class="status-row ${stOffsite.cls}"><span class="light"></span><div>${stOffsite.txt}</div></div>
+      <div class="status-row ${stMedia.cls}"><span class="light"></span><div>${stMedia.txt}</div></div>
+    </div>
+    <div class="how">
+      <b>¿Cómo funciona?</b> El sistema guarda una copia de todos los datos <b>cada hora</b> y también <b>cada vez que entra una consulta nueva</b>. Además, una copia completa se sube a un lugar seguro <b>fuera del servidor</b> (un repositorio privado de GitHub): si el servidor se rompiera, todo se recupera desde ahí. <b>No hay que hacer nada</b> — los botones de abajo son solo para casos especiales.
+    </div>
+    <div class="actions-row">
+      <button class="btn gold" id="btnRunBackup"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><polyline points="21 3 21 9 15 9"/></svg>Hacer backup ahora</button>
+      <a class="btn" href="/admin/backup/download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar copia actual</a>
+    </div>
+    <div class="run-result" id="runResult"></div>
   </div>
   <div class="card">
-    <h2>DB actual</h2>
-    <div class="meta">${liveSize} KB · <code>${DB_PATH}</code></div>
-    <a class="btn" href="/admin/backup/download"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar DB actual</a>
-  </div>
-  <div class="card">
-    <h2>Snapshots</h2>
-    <div class="meta">${files.length} backups · se conservan los últimos ${BACKUP_KEEP}</div>
-    ${files.length ? `<table><thead><tr><th>Snapshot</th><th>Tamaño</th><th></th></tr></thead><tbody>${list}</tbody></table>` : '<div class="empty">No hay snapshots aún. Se generan al startup, cada hora y al recibir nuevas consultas.</div>'}
+    <h2>Copias guardadas</h2>
+    <div class="meta">${files.length} copias en el servidor (se conservan las últimas ${BACKUP_KEEP}) + las copias externas en GitHub</div>
+    ${files.length ? `<table><thead><tr><th>Cuándo</th><th>Tamaño</th><th></th></tr></thead><tbody>${listRecent}</tbody></table>` : '<div class="empty">No hay copias aún. Se generan al encender el servidor, cada hora y al recibir consultas.</div>'}
+    ${listOlder ? `<details class="older"><summary>Ver las ${files.length - 10} copias anteriores</summary><table><tbody>${listOlder}</tbody></table></details>` : ''}
   </div>
   <div class="card">
     <h2>Consultas de hoy</h2>
@@ -1099,7 +1231,47 @@ app.get('/admin/backup', (req, res) => {
     ${historialHtml}
   </div>
 </main>
+<script>
+(function(){
+  var btn = document.getElementById('btnRunBackup');
+  var out = document.getElementById('runResult');
+  function csrf(){ var m = document.cookie.match(/(?:^|; )csrf=([^;]+)/); return m ? { 'X-CSRF-Token': decodeURIComponent(m[1]) } : {}; }
+  btn.addEventListener('click', function(){
+    btn.disabled = true;
+    var orig = btn.innerHTML;
+    btn.innerHTML = 'Haciendo backup…';
+    out.className = 'run-result';
+    fetch('/admin/backup/run', { method: 'POST', credentials: 'same-origin', headers: csrf() })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.ok && d.offsiteOk !== false) {
+          out.textContent = '✓ Backup completo: copia local guardada y subida a GitHub.';
+          out.className = 'run-result ok';
+        } else if (d.ok) {
+          out.textContent = '⚠ Copia local guardada, pero la subida externa falló: ' + (d.offsiteError || 'ver logs');
+          out.className = 'run-result bad';
+        } else {
+          out.textContent = '✗ El backup falló: ' + (d.error || 'error desconocido');
+          out.className = 'run-result bad';
+        }
+        setTimeout(function(){ location.reload(); }, 2500);
+      })
+      .catch(function(e){ out.textContent = '✗ Error: ' + e.message; out.className = 'run-result bad'; btn.disabled = false; btn.innerHTML = orig; });
+  });
+})();
+</script>
 </body></html>`);
+});
+
+// Backup manual desde la página (espera al off-site para informar el resultado real).
+app.post('/admin/backup/run', requireCsrf, async (req, res) => {
+  if (!isAuthenticated(req)) return res.status(401).json({ error: 'unauth' });
+  try {
+    await snapshotDB('manual');
+    res.json({ ok: true, offsiteOk: lastBackup.offsiteOk, offsiteError: lastBackup.offsiteError, mediaCount: lastBackup.mediaCount });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: e.message });
+  }
 });
 
 app.get('/admin/backup/download', (req, res) => {
