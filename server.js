@@ -3307,8 +3307,28 @@ async function withWaRetry(fn) {
   throw lastErr;
 }
 
+// Huella de los envíos que hace el PROPIO server (bot o panel), para no confundirlos
+// en handleOutgoingCreate con mensajes que el humano manda desde su teléfono. La
+// verificación por wa_id fallaba: el evento message_create de nuestra propia respuesta
+// llega con un id distinto (o null) al que devolvió sendMessage, así que el bot se
+// auto-pausaba con su bienvenida. La huella por (destinatario+texto) es a prueba de eso.
+const _ownSends = [];
+function noteOwnSend(to, body) {
+  const tel = String(to).split('@')[0].replace(/[^\d]/g, '') || String(to);
+  _ownSends.push({ tel, body: String(body || ''), ts: Date.now() });
+  const cutoff = Date.now() - 60000;
+  while (_ownSends.length && _ownSends[0].ts < cutoff) _ownSends.shift();
+}
+function isOwnSend(tel, body) {
+  const cutoff = Date.now() - 60000;
+  const t = String(tel).split('@')[0].replace(/[^\d]/g, '') || String(tel);
+  const b = String(body || '');
+  return _ownSends.some(s => s.ts >= cutoff && s.body === b && (s.tel === t || !t || !s.tel));
+}
+
 // Envía texto y lo loguea en la DB como mensaje saliente.
 async function sendText(to, body) {
+  noteOwnSend(to, body); // registra la huella ANTES del await (el evento puede llegar primero)
   try {
     const msg = await withWaRetry(() => wa.sendText(chatIdFor(to) || to, body));
     logDebug({ kind: 'send_ok', to: maskTel(to), type: 'text' });
@@ -3626,9 +3646,14 @@ async function handleOutgoingCreate(msg) {
     // está en 'messages' por su wa_id, es nuestro → ignorar, sin depender solo de la
     // carrera de 1500ms con markProcessed (que podía auto-pausar el bot con su respuesta).
     if (wid && db.prepare('SELECT 1 FROM messages WHERE wa_id = ?').get(wid)) { markProcessed(wid); return; }
+    // Huella por contenido: si el texto coincide con algo que el propio server acaba de
+    // enviar (bot o panel), NO es un mensaje escrito desde el teléfono → no pausar ni
+    // re-registrar. Cubre el caso en que el message_create trae un wa_id que no matchea.
+    if (msg.type === 'chat' && isOwnSend(rawTo, msg.body || '')) { if (wid) markProcessed(wid); return; }
     if (wid && _markProcessed.run(wid).changes === 0) return; // ya registrado (envío del panel/bot)
     const tel = await resolveTelFromJid(rawTo, msg._data?.recipientPn);
     if (!tel) return;
+    if (msg.type === 'chat' && isOwnSend(tel, msg.body || '')) { if (wid) markProcessed(wid); return; }
     let saved = null;
     if (msg.hasMedia) { try { saved = await wa.saveIncomingMedia(msg); } catch {} }
     const type = msg.type === 'chat' ? 'text' : (msg.type === 'ptt' ? 'audio' : (msg.type || 'text'));
