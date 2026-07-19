@@ -3290,10 +3290,27 @@ function chatIdFor(tel) {
   catch { return null; }
 }
 
+// Reintenta un envío a WhatsApp si el cliente está momentáneamente desconectado
+// (durante un blip de reconexión, ~6s). Evita perder respuestas del bot: sin esto,
+// un WA_NOT_READY transitorio descartaba la respuesta en silencio y, como el mensaje
+// entrante ya quedaba marcado como procesado, nunca se reintentaba.
+async function withWaRetry(fn) {
+  let lastErr;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try { return await fn(); }
+    catch (e) {
+      lastErr = e;
+      if (e.code !== 'WA_NOT_READY') throw e;
+      await new Promise(r => setTimeout(r, 2500));
+    }
+  }
+  throw lastErr;
+}
+
 // Envía texto y lo loguea en la DB como mensaje saliente.
 async function sendText(to, body) {
   try {
-    const msg = await wa.sendText(chatIdFor(to) || to, body);
+    const msg = await withWaRetry(() => wa.sendText(chatIdFor(to) || to, body));
     logDebug({ kind: 'send_ok', to: maskTel(to), type: 'text' });
     if (msg?.id?._serialized) markProcessed(msg.id._serialized); // evita doble registro vía message_create
     recordMessage(to, 'out', 'text', body, msg?.id?._serialized || null);
@@ -3334,8 +3351,8 @@ const _rnd = (a, b) => a + Math.random() * (b - a);
 const _sleep = ms => new Promise(r => setTimeout(r, ms));
 async function sendBotReply(tel, body) {
   try {
-    const readMs = _rnd(1500, 4000);                                   // "leyendo" el mensaje del cliente
-    const typeMs = Math.min(9000, 800 + String(body).length * _rnd(35, 65)); // "tipeando" según el largo
+    const readMs = _rnd(400, 1200);                                    // "leyendo" el mensaje del cliente
+    const typeMs = Math.min(4000, 400 + String(body).length * _rnd(15, 30)); // "tipeando" según el largo
     await _sleep(readMs);
     try { await wa.setTyping(chatIdFor(tel) || tel, true); } catch {}
     await _sleep(typeMs);
@@ -3376,6 +3393,28 @@ const setState = (tel, fields) => {
   }
 };
 const clearState = (tel) => db.prepare('DELETE FROM bot_state WHERE telefono = ?').run(tel);
+
+// Reanudación automática del bot: si un chat quedó en pausa (un humano respondió
+// desde el panel o el teléfono) pero pasaron muchas horas sin actividad SALIENTE y
+// el cliente vuelve a escribir, devolvemos el control al bot. Evita que un chat quede
+// mudo para siempre por una intervención humana puntual. Configurable con BOT_RESUME_HOURS
+// (0 = desactivado, nunca reanuda solo).
+const BOT_RESUME_HOURS = Number(process.env.BOT_RESUME_HOURS || 12);
+function maybeAutoResume(tel) {
+  try {
+    if (!BOT_RESUME_HOURS) return;
+    const conv = db.prepare('SELECT bot_paused FROM conversations WHERE telefono = ?').get(tel);
+    if (!conv || !conv.bot_paused) return;
+    const lastOut = db.prepare("SELECT created_at FROM messages WHERE telefono = ? AND direction = 'out' ORDER BY created_at DESC LIMIT 1").get(tel);
+    const ref = lastOut?.created_at;
+    // Sin saliente previa, o la última fue hace más de la ventana → reanudar.
+    const stale = !ref || !!db.prepare("SELECT (julianday('now','localtime') - julianday(?)) * 24 >= ? AS s").get(ref, BOT_RESUME_HOURS).s;
+    if (stale) {
+      db.prepare('UPDATE conversations SET bot_paused = 0 WHERE telefono = ?').run(tel);
+      logDebug({ kind: 'bot_auto_resume', tel: maskTel(tel) });
+    }
+  } catch (e) { console.error('[wa] maybeAutoResume', e.message); }
+}
 
 // Arranca el cuestionario: setea el paso inicial (elegir área) y manda el menú.
 async function startFlow(from) {
@@ -3483,10 +3522,29 @@ function notePushName(tel, name) {
 }
 
 // Reemplaza al webhook de Meta. Se engancha vía wa.init({ onMessage: handleIncoming }).
-async function handleIncoming(msg) {
+//
+// Cola por conversación: serializa el procesamiento de los mensajes de un mismo
+// número. Sin esto, dos burbujas seguidas lanzaban dos handlers en paralelo que
+// leían el MISMO bot_state y ambos avanzaban el flujo y respondían → mensajes
+// duplicados + datos pisados. Ahora cada 'from' encadena su handler al anterior.
+const _inboxQueues = new Map();
+function handleIncoming(msg) {
   try {
     if (!msg || msg.from === 'status@broadcast' || msg.isStatus) return;
     if (typeof msg.from === 'string' && msg.from.endsWith('@g.us')) return; // ignora grupos
+    const key = String(msg.from || '');
+    if (!key) return;
+    const prev = _inboxQueues.get(key) || Promise.resolve();
+    const run = () => _handleIncoming(msg);
+    const next = prev.then(run, run); // corre aunque el mensaje anterior haya fallado
+    _inboxQueues.set(key, next);
+    next.finally(() => { if (_inboxQueues.get(key) === next) _inboxQueues.delete(key); });
+    return next;
+  } catch (e) { console.error('[wa] handleIncoming enqueue error', e.message); }
+}
+
+async function _handleIncoming(msg) {
+  try {
     const from = await resolveTelFromJid(msg.from, msg._data?.senderPn);
     if (!from) return;
 
@@ -3496,6 +3554,7 @@ async function handleIncoming(msg) {
 
     console.log('[wa] msg de', maskTel(from), 'tipo', msg.type);
 
+    maybeAutoResume(from); // devuelve el chat al bot si estuvo horas sin respuesta humana
     const isPaused = () => !!db.prepare('SELECT bot_paused FROM conversations WHERE telefono = ?').get(from)?.bot_paused;
 
     // Media entrante (imagen/audio/video/documento/sticker)
@@ -3563,6 +3622,10 @@ async function handleOutgoingCreate(msg) {
     // message_create; el delay garantiza que sendText ya los marcó como procesados.
     await new Promise(r => setTimeout(r, 1500));
     const wid = msg.id?._serialized || null;
+    // Nunca pausar el bot por un mensaje que el propio server envió (bot o panel): si ya
+    // está en 'messages' por su wa_id, es nuestro → ignorar, sin depender solo de la
+    // carrera de 1500ms con markProcessed (que podía auto-pausar el bot con su respuesta).
+    if (wid && db.prepare('SELECT 1 FROM messages WHERE wa_id = ?').get(wid)) { markProcessed(wid); return; }
     if (wid && _markProcessed.run(wid).changes === 0) return; // ya registrado (envío del panel/bot)
     const tel = await resolveTelFromJid(rawTo, msg._data?.recipientPn);
     if (!tel) return;
@@ -3606,7 +3669,11 @@ async function syncMissedMessages() {
       const rawChat = String(m.fromMe ? m.to : m.from || '');
       if (!rawChat || rawChat === 'status@broadcast' || rawChat.endsWith('@g.us')) continue;
       const wid = m.id?._serialized || null;
-      if (!wid || _markProcessed.run(wid).changes === 0) continue; // ya lo teníamos
+      if (!wid) continue;
+      // Dedup robusto: no re-insertar si ya está en 'messages' (aunque processed_messages
+      // se haya limpiado a los 7 días). Evita duplicados en el inbox tras un redeploy.
+      if (db.prepare('SELECT 1 FROM messages WHERE wa_id = ?').get(wid)) { _markProcessed.run(wid); continue; }
+      if (_markProcessed.run(wid).changes === 0) continue; // ya lo teníamos
       const tel = await resolveTelFromJid(rawChat, m.fromMe ? m._data?.recipientPn : m._data?.senderPn);
       if (!tel) continue;
       const dir = m.fromMe ? 'out' : 'in';
